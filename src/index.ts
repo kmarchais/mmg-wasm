@@ -31,6 +31,21 @@ export {
   type MMG2DModule,
 } from "./mmg2d";
 
+// Export MMGS bindings
+export {
+  initMMGS,
+  getWasmModuleS,
+  MMGS,
+  IPARAM_S,
+  DPARAM_S,
+  MMG_RETURN_CODES_S,
+  type MeshHandleS,
+  type MeshSizeS,
+  type IParamKeyS,
+  type DParamKeyS,
+  type MMGSModule,
+} from "./mmgs";
+
 // Export memory utilities
 export {
   toWasmFloat64,
