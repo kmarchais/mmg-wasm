@@ -1,6 +1,20 @@
 // mmg-wasm TypeScript bindings
-// This file will export the mmg WASM module interface
+// This file exports the mmg WASM module interface
 
+// Export MMG3D bindings
+export {
+  initMMG3D,
+  MMG3D,
+  IPARAM,
+  DPARAM,
+  MMG_RETURN_CODES,
+  type MeshHandle,
+  type MeshSize,
+  type IParamKey,
+  type DParamKey,
+} from "./mmg3d";
+
+// Legacy interface (for backwards compatibility)
 export interface MmgModule {
   mmg_version(): string;
   mmgwasm_version(): string;
