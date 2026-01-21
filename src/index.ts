@@ -14,6 +14,18 @@ export {
   type DParamKey,
 } from "./mmg3d";
 
+// Export memory utilities
+export {
+  toWasmFloat64,
+  toWasmInt32,
+  fromWasmFloat64,
+  fromWasmInt32,
+  freeWasmArray,
+  getMemoryStats,
+  type WasmModule,
+  type MemoryStats,
+} from "./memory";
+
 // Legacy interface (for backwards compatibility)
 export interface MmgModule {
   mmg_version(): string;
