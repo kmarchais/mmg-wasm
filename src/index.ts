@@ -26,8 +26,14 @@ export {
   fromWasmUint32,
   freeWasmArray,
   getMemoryStats,
+  configureMemory,
+  checkMemoryAvailable,
+  estimateMeshMemory,
+  resetMemoryTracking,
+  MemoryError,
   type WasmModule,
   type MemoryStats,
+  type MemoryConfig,
 } from "./memory";
 
 // Legacy interface (for backwards compatibility)
