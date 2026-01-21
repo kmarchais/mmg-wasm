@@ -38,6 +38,10 @@ set(LIBMMGS_SHARED OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(MMG_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 
+# Disable Fortran header generation - genheader.js can't run Perl via system()
+# in WASM environment, and we don't need Fortran bindings anyway
+set(CMAKE_DISABLE_FIND_PACKAGE_Perl TRUE)
+
 # Fetch and make available
 FetchContent_MakeAvailable(mmg)
 

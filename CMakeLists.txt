@@ -14,6 +14,11 @@ endif()
 # Include our CMake modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(EmscriptenConfig)
+
+# Create a package.json in the build directory to ensure generated JS files
+# are treated as CommonJS (mmg's build tools use require())
+file(WRITE "${CMAKE_BINARY_DIR}/package.json" "{\"type\": \"commonjs\"}\n")
+
 include(FetchMMG)
 
 # Output build info
