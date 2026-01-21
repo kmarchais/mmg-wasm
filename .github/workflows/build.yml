@@ -1,0 +1,99 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  EMSDK_VERSION: "4.0.10"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build_type: [Release, Debug]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: ${{ env.EMSDK_VERSION }}
+          actions-cache-folder: emsdk-cache
+
+      - name: Verify toolchain
+        run: bun run toolchain:check
+
+      - name: Build (${{ matrix.build_type }})
+        run: bun run build ${{ matrix.build_type }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mmg-wasm-${{ matrix.build_type }}
+          path: |
+            build/dist/*.js
+            build/dist/*.wasm
+          if-no-files-found: ignore
+
+  toolchain-check:
+    runs-on: ubuntu-latest
+    name: Verify toolchain check script
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Verify check fails without emsdk
+        run: |
+          # The toolchain check should fail without emsdk installed
+          if bun run toolchain:check; then
+            echo "ERROR: toolchain:check should have failed without emsdk"
+            exit 1
+          else
+            echo "OK: toolchain:check correctly failed without emsdk"
+          fi
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: ${{ env.EMSDK_VERSION }}
+          actions-cache-folder: emsdk-cache
+
+      - name: Verify check passes with emsdk
+        run: bun run toolchain:check
+
+  docker:
+    runs-on: ubuntu-latest
+    name: Docker build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t mmg-wasm-builder .
+
+      - name: Verify toolchain in Docker
+        run: docker run --rm mmg-wasm-builder bun run toolchain:check

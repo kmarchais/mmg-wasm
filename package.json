@@ -9,7 +9,12 @@
     "dist"
   ],
   "scripts": {
-    "build": "echo 'TODO: Add Emscripten build script'",
+    "build": "./scripts/build.sh",
+    "build:debug": "./scripts/build.sh Debug",
+    "build:docker": "docker build -t mmg-wasm-builder . && docker run --rm -v $(pwd)/build:/app/build mmg-wasm-builder",
+    "clean": "rm -rf build dist",
+    "toolchain:check": "./scripts/check-toolchain.sh",
+    "toolchain:setup": "./scripts/setup-emsdk.sh",
     "test": "echo 'TODO: Add tests'"
   },
   "repository": {
