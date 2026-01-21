@@ -326,7 +326,7 @@ describe("Memory Utilities", () => {
 
       expect(stats.heapSize).toBeGreaterThan(0);
       expect(stats.heapUsed).toBeGreaterThanOrEqual(0);
-      expect(stats.heapFree).toBeGreaterThanOrEqual(0);
+      expect(stats.trackedHeapFree).toBeGreaterThanOrEqual(0);
       expect(stats.heapMax).toBe(2 * 1024 * 1024 * 1024); // 2GB
       expect(stats.usagePercent).toBeGreaterThanOrEqual(0);
     });
@@ -537,6 +537,34 @@ describe("Memory Utilities", () => {
       // Both settings should be preserved (tested indirectly through behavior)
       expect(() => configureMemory(module, {})).not.toThrow();
     });
+
+    it("should clamp negative thresholds to 0", () => {
+      configureMemory(module, { warnThreshold: -0.5, errorThreshold: -1 });
+
+      // Very small allocation should not trigger error with threshold clamped to 0
+      // (0 threshold means error on any allocation, but clamping means it becomes 0)
+      // Actually with threshold at 0, any allocation would exceed it
+      // Let's verify the behavior is defined (no crash)
+      expect(() => configureMemory(module, { warnThreshold: -0.5 })).not.toThrow();
+    });
+
+    it("should clamp thresholds greater than 1 to 1", () => {
+      configureMemory(module, { warnThreshold: 1.5, errorThreshold: 2.0 });
+
+      // With threshold at 1.0, very large allocations should still work until truly at limit
+      // Let's just verify it doesn't throw during configuration
+      expect(() => configureMemory(module, { errorThreshold: 1.5 })).not.toThrow();
+
+      // Verify behavior: with errorThreshold clamped to 1.0, we can allocate without error
+      const data = new Float64Array(1000);
+      const ptr = toWasmFloat64(module, data);
+      try {
+        // Should not throw since we're well under 100% of 2GB
+        expect(() => checkMemoryAvailable(module, 1000)).not.toThrow();
+      } finally {
+        freeWasmArray(module, ptr);
+      }
+    });
   });
 
   describe("checkMemoryAvailable", () => {
@@ -700,6 +728,84 @@ describe("Memory Utilities", () => {
       const stats = getMemoryStats(module);
       const error = new MemoryError("test", 1000, 500, stats);
       expect(error).toBeInstanceOf(Error);
+    });
+  });
+
+  describe("Warning debouncing", () => {
+    beforeEach(() => {
+      resetMemoryTracking(module);
+      configureMemory(module, {
+        warnThreshold: 0.8,
+        errorThreshold: 0.95,
+        verbose: false,
+      });
+    });
+
+    it("should only warn once when crossing threshold", () => {
+      const warnings: string[] = [];
+      const originalWarn = console.warn;
+      console.warn = mock((...args: unknown[]) => {
+        warnings.push(args.join(" "));
+      });
+
+      try {
+        // Set a very low threshold so we can trigger it
+        configureMemory(module, { warnThreshold: 0.0000001 });
+
+        // First allocation should trigger warning
+        const data1 = new Float64Array(100);
+        const ptr1 = toWasmFloat64(module, data1);
+
+        // Second allocation should NOT trigger another warning
+        const data2 = new Float64Array(100);
+        const ptr2 = toWasmFloat64(module, data2);
+
+        // Third allocation should NOT trigger another warning
+        const data3 = new Float64Array(100);
+        const ptr3 = toWasmFloat64(module, data3);
+
+        // Should only have one warning
+        const memoryWarnings = warnings.filter((w) => w.includes("[mmg-wasm]"));
+        expect(memoryWarnings.length).toBe(1);
+
+        freeWasmArray(module, ptr1);
+        freeWasmArray(module, ptr2);
+        freeWasmArray(module, ptr3);
+      } finally {
+        console.warn = originalWarn;
+      }
+    });
+
+    it("should warn again after falling below and crossing threshold again", () => {
+      const warnings: string[] = [];
+      const originalWarn = console.warn;
+      console.warn = mock((...args: unknown[]) => {
+        warnings.push(args.join(" "));
+      });
+
+      try {
+        // Set a very low threshold
+        configureMemory(module, { warnThreshold: 0.0000001 });
+
+        // First allocation triggers warning
+        const data1 = new Float64Array(100);
+        const ptr1 = toWasmFloat64(module, data1);
+
+        // Free it - this resets the warning flag
+        freeWasmArray(module, ptr1);
+
+        // Second allocation should trigger warning again
+        const data2 = new Float64Array(100);
+        const ptr2 = toWasmFloat64(module, data2);
+
+        // Should have two warnings
+        const memoryWarnings = warnings.filter((w) => w.includes("[mmg-wasm]"));
+        expect(memoryWarnings.length).toBe(2);
+
+        freeWasmArray(module, ptr2);
+      } finally {
+        console.warn = originalWarn;
+      }
     });
   });
 

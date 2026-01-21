@@ -31,10 +31,13 @@ export interface WasmModule {
 export interface MemoryStats {
   /** Current WASM heap buffer size in bytes */
   heapSize: number;
-  /** Approximate bytes allocated through mmg-wasm utilities */
+  /** Approximate bytes allocated through mmg-wasm utilities (JS-side only) */
   heapUsed: number;
-  /** Approximate bytes available (heapSize - heapUsed) */
-  heapFree: number;
+  /**
+   * Approximate bytes available based on tracked allocations (heapSize - heapUsed).
+   * Note: This only accounts for JS-side allocations, not MMG's internal C mallocs.
+   */
+  trackedHeapFree: number;
   /** Maximum heap size allowed (default: 2GB for 32-bit WASM) */
   heapMax: number;
   /** Percentage of heapMax used (heapUsed / heapMax * 100) */
@@ -78,6 +81,8 @@ interface AllocationTracker {
   allocations: Map<number, AllocationRecord>;
   totalAllocated: number;
   config: MemoryConfig;
+  /** Flag to prevent repeated warnings once threshold is crossed */
+  hasWarned: boolean;
 }
 
 const DEFAULT_CONFIG: MemoryConfig = {
@@ -97,10 +102,44 @@ function getOrCreateTracker(module: WasmModule): AllocationTracker {
       allocations: new Map(),
       totalAllocated: 0,
       config: { ...DEFAULT_CONFIG },
+      hasWarned: false,
     };
     trackers.set(module, tracker);
   }
   return tracker;
+}
+
+/**
+ * Track an allocation and emit warnings/logs as configured.
+ * Extracted to avoid code duplication across toWasm* functions.
+ */
+function trackAllocation(
+  tracker: AllocationTracker,
+  ptr: number,
+  byteLength: number,
+  type: AllocationRecord["type"],
+  elementCount: number,
+): void {
+  tracker.allocations.set(ptr, { size: byteLength, type });
+  tracker.totalAllocated += byteLength;
+
+  if (tracker.config.verbose) {
+    const typeName = type === "float64" ? "Float64" : type === "int32" ? "Int32" : "Uint32";
+    console.log(
+      `[mmg-wasm] Allocated ${byteLength} bytes (${typeName}[${elementCount}]), ` +
+        `total: ${tracker.totalAllocated} bytes`,
+    );
+  }
+
+  // Warning check - only warn once per threshold crossing
+  const usagePercent = tracker.totalAllocated / DEFAULT_HEAP_MAX;
+  if (usagePercent >= tracker.config.warnThreshold && !tracker.hasWarned) {
+    tracker.hasWarned = true;
+    console.warn(
+      `[mmg-wasm] Memory usage at ${(usagePercent * 100).toFixed(1)}% ` +
+        `(${tracker.totalAllocated} / ${DEFAULT_HEAP_MAX} bytes)`,
+    );
+  }
 }
 
 /**
@@ -137,26 +176,7 @@ export function toWasmFloat64(module: WasmModule, data: Float64Array): number {
     );
   }
 
-  // Track allocation
-  tracker.allocations.set(ptr, { size: byteLength, type: "float64" });
-  tracker.totalAllocated += byteLength;
-
-  // Verbose logging
-  if (tracker.config.verbose) {
-    console.log(
-      `[mmg-wasm] Allocated ${byteLength} bytes (Float64[${data.length}]), ` +
-        `total: ${tracker.totalAllocated} bytes`,
-    );
-  }
-
-  // Warning check
-  const usagePercent = tracker.totalAllocated / DEFAULT_HEAP_MAX;
-  if (usagePercent >= tracker.config.warnThreshold) {
-    console.warn(
-      `[mmg-wasm] Memory usage at ${(usagePercent * 100).toFixed(1)}% ` +
-        `(${tracker.totalAllocated} / ${DEFAULT_HEAP_MAX} bytes)`,
-    );
-  }
+  trackAllocation(tracker, ptr, byteLength, "float64", data.length);
 
   // Copy data to WASM heap (Float64Array needs 8-byte alignment, which _malloc provides)
   module.HEAPF64.set(data, ptr / 8);
@@ -197,26 +217,7 @@ export function toWasmInt32(module: WasmModule, data: Int32Array): number {
     );
   }
 
-  // Track allocation
-  tracker.allocations.set(ptr, { size: byteLength, type: "int32" });
-  tracker.totalAllocated += byteLength;
-
-  // Verbose logging
-  if (tracker.config.verbose) {
-    console.log(
-      `[mmg-wasm] Allocated ${byteLength} bytes (Int32[${data.length}]), ` +
-        `total: ${tracker.totalAllocated} bytes`,
-    );
-  }
-
-  // Warning check
-  const usagePercent = tracker.totalAllocated / DEFAULT_HEAP_MAX;
-  if (usagePercent >= tracker.config.warnThreshold) {
-    console.warn(
-      `[mmg-wasm] Memory usage at ${(usagePercent * 100).toFixed(1)}% ` +
-        `(${tracker.totalAllocated} / ${DEFAULT_HEAP_MAX} bytes)`,
-    );
-  }
+  trackAllocation(tracker, ptr, byteLength, "int32", data.length);
 
   // Copy data to WASM heap
   module.HEAP32.set(data, ptr / 4);
@@ -257,26 +258,7 @@ export function toWasmUint32(module: WasmModule, data: Uint32Array): number {
     );
   }
 
-  // Track allocation
-  tracker.allocations.set(ptr, { size: byteLength, type: "uint32" });
-  tracker.totalAllocated += byteLength;
-
-  // Verbose logging
-  if (tracker.config.verbose) {
-    console.log(
-      `[mmg-wasm] Allocated ${byteLength} bytes (Uint32[${data.length}]), ` +
-        `total: ${tracker.totalAllocated} bytes`,
-    );
-  }
-
-  // Warning check
-  const usagePercent = tracker.totalAllocated / DEFAULT_HEAP_MAX;
-  if (usagePercent >= tracker.config.warnThreshold) {
-    console.warn(
-      `[mmg-wasm] Memory usage at ${(usagePercent * 100).toFixed(1)}% ` +
-        `(${tracker.totalAllocated} / ${DEFAULT_HEAP_MAX} bytes)`,
-    );
-  }
+  trackAllocation(tracker, ptr, byteLength, "uint32", data.length);
 
   // Copy data to WASM heap (create Uint32Array view since HEAPU32 may not be exported)
   const heapU32 = new Uint32Array(module.HEAPU8.buffer, ptr, data.length);
@@ -413,6 +395,12 @@ export function freeWasmArray(module: WasmModule, ptr: number): void {
             `[mmg-wasm] Freed ${record.size} bytes, total: ${tracker.totalAllocated} bytes`,
           );
         }
+
+        // Reset warning flag if usage falls below threshold
+        const usagePercent = tracker.totalAllocated / DEFAULT_HEAP_MAX;
+        if (usagePercent < tracker.config.warnThreshold) {
+          tracker.hasWarned = false;
+        }
       }
     }
     module._free(ptr);
@@ -440,10 +428,10 @@ export function getMemoryStats(module: WasmModule): MemoryStats {
   const heapSize = module.HEAPU8.byteLength;
   const heapUsed = tracker.totalAllocated;
   const heapMax = DEFAULT_HEAP_MAX;
-  const heapFree = Math.max(0, heapSize - heapUsed);
+  const trackedHeapFree = Math.max(0, heapSize - heapUsed);
   const usagePercent = (heapUsed / heapMax) * 100;
 
-  return { heapSize, heapUsed, heapFree, heapMax, usagePercent };
+  return { heapSize, heapUsed, trackedHeapFree, heapMax, usagePercent };
 }
 
 /**
@@ -463,7 +451,23 @@ export function configureMemory(
   config: Partial<MemoryConfig>,
 ): void {
   const tracker = getOrCreateTracker(module);
-  tracker.config = { ...tracker.config, ...config };
+
+  // Validate and clamp threshold values to [0, 1]
+  const validatedConfig: Partial<MemoryConfig> = { ...config };
+  if (validatedConfig.warnThreshold !== undefined) {
+    validatedConfig.warnThreshold = Math.max(0, Math.min(1, validatedConfig.warnThreshold));
+  }
+  if (validatedConfig.errorThreshold !== undefined) {
+    validatedConfig.errorThreshold = Math.max(0, Math.min(1, validatedConfig.errorThreshold));
+  }
+
+  tracker.config = { ...tracker.config, ...validatedConfig };
+
+  // Reset warning flag if new threshold is higher than current usage
+  const usagePercent = tracker.totalAllocated / DEFAULT_HEAP_MAX;
+  if (usagePercent < tracker.config.warnThreshold) {
+    tracker.hasWarned = false;
+  }
 }
 
 /**
@@ -492,7 +496,7 @@ export function checkMemoryAvailable(module: WasmModule, bytes: number): void {
       `Allocation of ${bytes} bytes would exceed ${(tracker.config.errorThreshold * 100).toFixed(0)}% ` +
         `memory threshold (current: ${stats.usagePercent.toFixed(1)}%)`,
       bytes,
-      stats.heapFree,
+      stats.trackedHeapFree,
       stats,
     );
   }
@@ -520,9 +524,18 @@ export function estimateMeshMemory(
   nTetrahedra: number,
   nTriangles: number,
 ): number {
+  // Per-element byte estimates based on MMG's internal data structures:
+  // - Vertex: 3 coords (24B) + refs/tags (16B) ≈ 40 bytes
+  // - Tetrahedron: 4 vertices + 4 adjacents + refs/tags ≈ 80 bytes
+  // - Triangle: 3 vertices + refs/tags ≈ 32 bytes
   const VERTEX_BYTES = 40;
   const TETRA_BYTES = 80;
   const TRIANGLE_BYTES = 32;
+
+  // 1.5x overhead accounts for:
+  // - MMG's working memory during remeshing (edge swaps, vertex insertions)
+  // - Temporary buffers and hash tables
+  // - Memory fragmentation in the WASM allocator
   const OVERHEAD_FACTOR = 1.5;
 
   const rawBytes =
@@ -540,12 +553,20 @@ export function estimateMeshMemory(
  * Useful if you need to reset tracking state after external operations
  * that bypass the toWasm/freeWasmArray functions.
  *
+ * **Warning:** After calling this function, do not use `freeWasmArray` on
+ * pointers that were allocated before the reset. Instead, use `module._free(ptr)`
+ * directly. Calling `freeWasmArray` on untracked pointers is safe but won't
+ * update the tracking statistics.
+ *
  * @param module - The WASM module instance
  *
  * @example
  * ```ts
  * // After calling MMG functions that manage their own memory
  * resetMemoryTracking(module);
+ *
+ * // Free old pointers directly (not through freeWasmArray)
+ * module._free(oldPtr);
  * ```
  */
 export function resetMemoryTracking(module: WasmModule): void {
@@ -553,5 +574,6 @@ export function resetMemoryTracking(module: WasmModule): void {
   if (tracker) {
     tracker.allocations.clear();
     tracker.totalAllocated = 0;
+    tracker.hasWarned = false;
   }
 }
