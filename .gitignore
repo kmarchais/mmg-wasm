@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.wasm
+*.js.map
+
+# Emscripten
+mmg/
+emsdk/
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
