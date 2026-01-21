@@ -23,7 +23,8 @@
     "check": "biome check src",
     "clean": "rm -rf build dist",
     "toolchain:check": "./scripts/check-toolchain.sh",
-    "toolchain:setup": "./scripts/setup-emsdk.sh"
+    "toolchain:setup": "./scripts/setup-emsdk.sh",
+    "example": "bunx serve . -p 3000"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
