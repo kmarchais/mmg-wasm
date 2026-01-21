@@ -31,6 +31,25 @@ _Static_assert(sizeof(MMG5_int) == sizeof(int32_t),
  */
 #define MAX_HANDLES 64
 
+/*
+ * Helper macro for safe multi-allocation with cleanup.
+ * Allocates multiple arrays and jumps to cleanup label if any fails.
+ * All pointers must be initialized to NULL before using this macro.
+ */
+#define ALLOC_OR_FAIL(ptr, count, type) \
+    do { \
+        (ptr) = (type*)malloc((count) * sizeof(type)); \
+        if (!(ptr)) goto cleanup; \
+    } while(0)
+
+/*
+ * Helper to set out_count and return NULL (common failure pattern).
+ */
+static inline void* fail_with_count(int* out_count) {
+    if (out_count) *out_count = 0;
+    return NULL;
+}
+
 /* Handle table entry storing mesh and solution pointers */
 typedef struct {
     MMG5_pMesh mesh;
@@ -253,49 +272,30 @@ int mmg2d_set_vertices(int handle, double* vertices, int* refs) {
  */
 EMSCRIPTEN_KEEPALIVE
 double* mmg2d_get_vertices(int handle, int* out_count) {
-    if (!validate_handle_2d(handle)) {
-        if (out_count) *out_count = 0;
-        return NULL;
-    }
+    if (!validate_handle_2d(handle))
+        return fail_with_count(out_count);
 
     MMG5_int np, nt, nquad, na;
-    if (MMG2D_Get_meshSize(g_handles_2d[handle].mesh, &np, &nt, &nquad, &na) != 1) {
-        if (out_count) *out_count = 0;
-        return NULL;
-    }
+    if (MMG2D_Get_meshSize(g_handles_2d[handle].mesh, &np, &nt, &nquad, &na) != 1)
+        return fail_with_count(out_count);
 
-    if (np == 0) {
-        if (out_count) *out_count = 0;
-        return NULL;
-    }
+    if (np == 0)
+        return fail_with_count(out_count);
 
-    /* Allocate output array (2D: x, y per vertex) */
-    double* vertices = (double*)malloc(2 * np * sizeof(double));
-    if (!vertices) {
-        if (out_count) *out_count = 0;
-        return NULL;
-    }
+    /* Initialize all pointers to NULL for safe cleanup */
+    double* vertices = NULL;
+    MMG5_int* refs = NULL;
+    int* corners = NULL;
+    int* required = NULL;
 
-    /* We need refs, corners and required arrays for the API but can discard them */
-    MMG5_int* refs = (MMG5_int*)malloc(np * sizeof(MMG5_int));
-    int* corners = (int*)malloc(np * sizeof(int));
-    int* required = (int*)malloc(np * sizeof(int));
-
-    if (!refs || !corners || !required) {
-        free(vertices);
-        free(refs);
-        free(corners);
-        free(required);
-        if (out_count) *out_count = 0;
-        return NULL;
-    }
+    /* Allocate all arrays - goto cleanup on any failure */
+    ALLOC_OR_FAIL(vertices, 2 * np, double);
+    ALLOC_OR_FAIL(refs, np, MMG5_int);
+    ALLOC_OR_FAIL(corners, np, int);
+    ALLOC_OR_FAIL(required, np, int);
 
     int result = MMG2D_Get_vertices(
-        g_handles_2d[handle].mesh,
-        vertices,
-        refs,
-        corners,
-        required
+        g_handles_2d[handle].mesh, vertices, refs, corners, required
     );
 
     free(refs);
@@ -304,12 +304,18 @@ double* mmg2d_get_vertices(int handle, int* out_count) {
 
     if (result != 1) {
         free(vertices);
-        if (out_count) *out_count = 0;
-        return NULL;
+        return fail_with_count(out_count);
     }
 
     if (out_count) *out_count = (int)np;
     return vertices;
+
+cleanup:
+    free(vertices);
+    free(refs);
+    free(corners);
+    free(required);
+    return fail_with_count(out_count);
 }
 
 /**
@@ -360,46 +366,28 @@ int mmg2d_set_triangles(int handle, int* tria, int* refs) {
  */
 EMSCRIPTEN_KEEPALIVE
 int* mmg2d_get_triangles(int handle, int* out_count) {
-    if (!validate_handle_2d(handle)) {
-        if (out_count) *out_count = 0;
-        return NULL;
-    }
+    if (!validate_handle_2d(handle))
+        return fail_with_count(out_count);
 
     MMG5_int np, nt, nquad, na;
-    if (MMG2D_Get_meshSize(g_handles_2d[handle].mesh, &np, &nt, &nquad, &na) != 1) {
-        if (out_count) *out_count = 0;
-        return NULL;
-    }
+    if (MMG2D_Get_meshSize(g_handles_2d[handle].mesh, &np, &nt, &nquad, &na) != 1)
+        return fail_with_count(out_count);
 
-    if (nt == 0) {
-        if (out_count) *out_count = 0;
-        return NULL;
-    }
+    if (nt == 0)
+        return fail_with_count(out_count);
 
-    /* Allocate output array (3 vertices per triangle) */
-    MMG5_int* tria = (MMG5_int*)malloc(3 * nt * sizeof(MMG5_int));
-    if (!tria) {
-        if (out_count) *out_count = 0;
-        return NULL;
-    }
+    /* Initialize all pointers to NULL for safe cleanup */
+    MMG5_int* tria = NULL;
+    MMG5_int* refs = NULL;
+    int* required = NULL;
 
-    /* We need refs and required arrays for the API but can discard them */
-    MMG5_int* refs = (MMG5_int*)malloc(nt * sizeof(MMG5_int));
-    int* required = (int*)malloc(nt * sizeof(int));
-
-    if (!refs || !required) {
-        free(tria);
-        free(refs);
-        free(required);
-        if (out_count) *out_count = 0;
-        return NULL;
-    }
+    /* Allocate all arrays - goto cleanup on any failure */
+    ALLOC_OR_FAIL(tria, 3 * nt, MMG5_int);
+    ALLOC_OR_FAIL(refs, nt, MMG5_int);
+    ALLOC_OR_FAIL(required, nt, int);
 
     int result = MMG2D_Get_triangles(
-        g_handles_2d[handle].mesh,
-        tria,
-        refs,
-        required
+        g_handles_2d[handle].mesh, tria, refs, required
     );
 
     free(refs);
@@ -407,12 +395,17 @@ int* mmg2d_get_triangles(int handle, int* out_count) {
 
     if (result != 1) {
         free(tria);
-        if (out_count) *out_count = 0;
-        return NULL;
+        return fail_with_count(out_count);
     }
 
     if (out_count) *out_count = (int)nt;
     return (int*)tria;  /* MMG5_int is int32_t, same as int */
+
+cleanup:
+    free(tria);
+    free(refs);
+    free(required);
+    return fail_with_count(out_count);
 }
 
 /**
@@ -463,49 +456,30 @@ int mmg2d_set_edges(int handle, int* edges, int* refs) {
  */
 EMSCRIPTEN_KEEPALIVE
 int* mmg2d_get_edges(int handle, int* out_count) {
-    if (!validate_handle_2d(handle)) {
-        if (out_count) *out_count = 0;
-        return NULL;
-    }
+    if (!validate_handle_2d(handle))
+        return fail_with_count(out_count);
 
     MMG5_int np, nt, nquad, na;
-    if (MMG2D_Get_meshSize(g_handles_2d[handle].mesh, &np, &nt, &nquad, &na) != 1) {
-        if (out_count) *out_count = 0;
-        return NULL;
-    }
+    if (MMG2D_Get_meshSize(g_handles_2d[handle].mesh, &np, &nt, &nquad, &na) != 1)
+        return fail_with_count(out_count);
 
-    if (na == 0) {
-        if (out_count) *out_count = 0;
-        return NULL;
-    }
+    if (na == 0)
+        return fail_with_count(out_count);
 
-    /* Allocate output array (2 vertices per edge) */
-    MMG5_int* edges = (MMG5_int*)malloc(2 * na * sizeof(MMG5_int));
-    if (!edges) {
-        if (out_count) *out_count = 0;
-        return NULL;
-    }
+    /* Initialize all pointers to NULL for safe cleanup */
+    MMG5_int* edges = NULL;
+    MMG5_int* refs = NULL;
+    int* ridges = NULL;
+    int* required = NULL;
 
-    /* We need refs, ridges and required arrays for the API but can discard them */
-    MMG5_int* refs = (MMG5_int*)malloc(na * sizeof(MMG5_int));
-    int* ridges = (int*)malloc(na * sizeof(int));
-    int* required = (int*)malloc(na * sizeof(int));
-
-    if (!refs || !ridges || !required) {
-        free(edges);
-        free(refs);
-        free(ridges);
-        free(required);
-        if (out_count) *out_count = 0;
-        return NULL;
-    }
+    /* Allocate all arrays - goto cleanup on any failure */
+    ALLOC_OR_FAIL(edges, 2 * na, MMG5_int);
+    ALLOC_OR_FAIL(refs, na, MMG5_int);
+    ALLOC_OR_FAIL(ridges, na, int);
+    ALLOC_OR_FAIL(required, na, int);
 
     int result = MMG2D_Get_edges(
-        g_handles_2d[handle].mesh,
-        edges,
-        refs,
-        ridges,
-        required
+        g_handles_2d[handle].mesh, edges, refs, ridges, required
     );
 
     free(refs);
@@ -514,12 +488,18 @@ int* mmg2d_get_edges(int handle, int* out_count) {
 
     if (result != 1) {
         free(edges);
-        if (out_count) *out_count = 0;
-        return NULL;
+        return fail_with_count(out_count);
     }
 
     if (out_count) *out_count = (int)na;
     return (int*)edges;  /* MMG5_int is int32_t, same as int */
+
+cleanup:
+    free(edges);
+    free(refs);
+    free(ridges);
+    free(required);
+    return fail_with_count(out_count);
 }
 
 /**
