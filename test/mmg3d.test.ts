@@ -50,6 +50,17 @@ describe("MMG3D", () => {
 			MMG3D.free(handle);
 			expect(() => MMG3D.free(handle)).toThrow();
 		});
+
+		it("should report max handles as 64", () => {
+			expect(MMG3D.getMaxHandles()).toBe(64);
+		});
+
+		it("should track available handles correctly", () => {
+			const initialAvailable = MMG3D.getAvailableHandles();
+			const handle = MMG3D.init();
+			handles.push(handle);
+			expect(MMG3D.getAvailableHandles()).toBe(initialAvailable - 1);
+		});
 	});
 
 	describe("Mesh Size", () => {
@@ -132,6 +143,33 @@ describe("MMG3D", () => {
 			// Should not throw
 			expect(() => MMG3D.setVertices(handle, vertices, refs)).not.toThrow();
 		});
+
+		it("should throw when vertices array length is not a multiple of 3", () => {
+			const handle = MMG3D.init();
+			handles.push(handle);
+
+			MMG3D.setMeshSize(handle, 4, 1, 0, 4, 0, 0);
+
+			const badVertices = new Float64Array([0.0, 0.0, 0.0, 1.0]); // length 4, not multiple of 3
+			expect(() => MMG3D.setVertices(handle, badVertices)).toThrow(
+				/must be a multiple of 3/,
+			);
+		});
+
+		it("should throw when refs array length does not match vertex count", () => {
+			const handle = MMG3D.init();
+			handles.push(handle);
+
+			MMG3D.setMeshSize(handle, 4, 1, 0, 4, 0, 0);
+
+			const vertices = new Float64Array([
+				0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.5, 1.0, 0.0, 0.5, 0.5, 1.0,
+			]);
+			const badRefs = new Int32Array([1, 2]); // 2 refs for 4 vertices
+			expect(() => MMG3D.setVertices(handle, vertices, badRefs)).toThrow(
+				/must match number of vertices/,
+			);
+		});
 	});
 
 	describe("Tetrahedra", () => {
@@ -179,6 +217,18 @@ describe("MMG3D", () => {
 			for (let i = 0; i < tetra.length; i++) {
 				expect(result[i]).toBe(tetra[i]);
 			}
+		});
+
+		it("should throw when tetrahedra array length is not a multiple of 4", () => {
+			const handle = MMG3D.init();
+			handles.push(handle);
+
+			MMG3D.setMeshSize(handle, 4, 1, 0, 4, 0, 0);
+
+			const badTetra = new Int32Array([1, 2, 3]); // length 3, not multiple of 4
+			expect(() => MMG3D.setTetrahedra(handle, badTetra)).toThrow(
+				/must be a multiple of 4/,
+			);
 		});
 	});
 
@@ -236,6 +286,18 @@ describe("MMG3D", () => {
 			for (let i = 0; i < tria.length; i++) {
 				expect(result[i]).toBe(tria[i]);
 			}
+		});
+
+		it("should throw when triangles array length is not a multiple of 3", () => {
+			const handle = MMG3D.init();
+			handles.push(handle);
+
+			MMG3D.setMeshSize(handle, 4, 1, 0, 4, 0, 0);
+
+			const badTria = new Int32Array([1, 2]); // length 2, not multiple of 3
+			expect(() => MMG3D.setTriangles(handle, badTria)).toThrow(
+				/must be a multiple of 3/,
+			);
 		});
 	});
 

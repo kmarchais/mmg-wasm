@@ -78,6 +78,8 @@ export const MMG_RETURN_CODES = {
 interface MMG3DModule {
   _mmg3d_init(): number;
   _mmg3d_free(handle: number): number;
+  _mmg3d_get_available_handles(): number;
+  _mmg3d_get_max_handles(): number;
   _mmg3d_set_mesh_size(
     handle: number,
     np: number,
@@ -217,6 +219,24 @@ export const MMG3D = {
   },
 
   /**
+   * Get the number of available (free) mesh handle slots.
+   * @returns Number of handles that can still be allocated
+   */
+  getAvailableHandles(): number {
+    const m = getModule();
+    return m._mmg3d_get_available_handles();
+  },
+
+  /**
+   * Get the maximum number of concurrent mesh handles supported.
+   * @returns Maximum number of handles (currently 64)
+   */
+  getMaxHandles(): number {
+    const m = getModule();
+    return m._mmg3d_get_max_handles();
+  },
+
+  /**
    * Set the mesh size (allocate memory for mesh entities).
    * @param handle - The mesh handle
    * @param nVertices - Number of vertices
@@ -328,6 +348,18 @@ export const MMG3D = {
     vertices: Float64Array,
     refs?: Int32Array,
   ): void {
+    if (vertices.length % 3 !== 0) {
+      throw new Error(
+        `vertices array length must be a multiple of 3, got ${vertices.length}`,
+      );
+    }
+    const nVertices = vertices.length / 3;
+    if (refs && refs.length !== nVertices) {
+      throw new Error(
+        `refs array length (${refs.length}) must match number of vertices (${nVertices})`,
+      );
+    }
+
     const m = getModule();
 
     // Allocate and copy vertices to WASM heap
@@ -435,6 +467,18 @@ export const MMG3D = {
     tetrahedra: Int32Array,
     refs?: Int32Array,
   ): void {
+    if (tetrahedra.length % 4 !== 0) {
+      throw new Error(
+        `tetrahedra array length must be a multiple of 4, got ${tetrahedra.length}`,
+      );
+    }
+    const nTetrahedra = tetrahedra.length / 4;
+    if (refs && refs.length !== nTetrahedra) {
+      throw new Error(
+        `refs array length (${refs.length}) must match number of tetrahedra (${nTetrahedra})`,
+      );
+    }
+
     const m = getModule();
 
     // Allocate and copy tetrahedra to WASM heap
@@ -541,6 +585,18 @@ export const MMG3D = {
     triangles: Int32Array,
     refs?: Int32Array,
   ): void {
+    if (triangles.length % 3 !== 0) {
+      throw new Error(
+        `triangles array length must be a multiple of 3, got ${triangles.length}`,
+      );
+    }
+    const nTriangles = triangles.length / 3;
+    if (refs && refs.length !== nTriangles) {
+      throw new Error(
+        `refs array length (${refs.length}) must match number of triangles (${nTriangles})`,
+      );
+    }
+
     const m = getModule();
 
     // Allocate and copy triangles to WASM heap

@@ -10,11 +10,25 @@
  */
 
 #include <emscripten.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include "mmg/mmg3d/libmmg3d.h"
 
-/* Maximum number of concurrent mesh handles */
+/*
+ * Verify MMG5_int is 32-bit. This assumption is used when casting between
+ * MMG5_int* and int* for the JavaScript bindings. If this fails, the get_*
+ * functions need to be updated to handle the size difference.
+ */
+_Static_assert(sizeof(MMG5_int) == sizeof(int32_t),
+    "MMG5_int must be 32-bit for JavaScript bindings");
+
+/*
+ * Maximum number of concurrent mesh handles.
+ * This limit exists because handles are stored in a fixed-size array.
+ * For typical browser usage, 64 concurrent meshes should be sufficient.
+ * Use mmg3d_get_available_handles() to check current capacity.
+ */
 #define MAX_HANDLES 64
 
 /* Handle table entry storing mesh and solution pointers */
@@ -54,6 +68,30 @@ static int validate_handle(int handle) {
         return 0;
     }
     return g_handles[handle].active;
+}
+
+/**
+ * Get the number of available (free) mesh handle slots.
+ * Returns a value between 0 and MAX_HANDLES.
+ */
+EMSCRIPTEN_KEEPALIVE
+int mmg3d_get_available_handles(void) {
+    ensure_initialized();
+    int count = 0;
+    for (int i = 0; i < MAX_HANDLES; i++) {
+        if (!g_handles[i].active) {
+            count++;
+        }
+    }
+    return count;
+}
+
+/**
+ * Get the maximum number of concurrent mesh handles supported.
+ */
+EMSCRIPTEN_KEEPALIVE
+int mmg3d_get_max_handles(void) {
+    return MAX_HANDLES;
 }
 
 /**

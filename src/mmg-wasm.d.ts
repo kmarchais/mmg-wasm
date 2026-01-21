@@ -6,6 +6,8 @@ declare module "*/mmg.js" {
   interface EmscriptenModule {
     _mmg3d_init(): number;
     _mmg3d_free(handle: number): number;
+    _mmg3d_get_available_handles(): number;
+    _mmg3d_get_max_handles(): number;
     _mmg3d_set_mesh_size(
       handle: number,
       np: number,

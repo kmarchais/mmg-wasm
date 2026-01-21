@@ -38,17 +38,19 @@ target_include_directories(mmg PRIVATE
     ${mmg_SOURCE_DIR}/src
 )
 
-# Exported functions for JavaScript bindings
+# Exported functions for JavaScript bindings (24 total)
 set(MMG_EXPORTED_FUNCTIONS
-    # Existing exports
+    # Existing exports (5)
     '_mmg_version'
     '_mmgwasm_version'
     '_mmg_test_init'
     '_malloc'
     '_free'
-    # MMG3D wrapper functions
+    # MMG3D wrapper functions (19)
     '_mmg3d_init'
     '_mmg3d_free'
+    '_mmg3d_get_available_handles'
+    '_mmg3d_get_max_handles'
     '_mmg3d_set_mesh_size'
     '_mmg3d_get_mesh_size'
     '_mmg3d_set_vertex'
