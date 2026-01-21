@@ -9,13 +9,25 @@
     "dist"
   ],
   "scripts": {
-    "build": "./scripts/build.sh",
+    "build": "bun run build:wasm && bun run build:ts",
+    "build:wasm": "emcmake cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build",
+    "build:ts": "bun build src/index.ts --outdir dist --target browser",
     "build:debug": "./scripts/build.sh Debug",
     "build:docker": "docker build -t mmg-wasm-builder . && docker run --rm -v $(pwd)/build:/app/build mmg-wasm-builder",
+    "dev": "bun run --watch src/index.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint src",
+    "format": "biome format src --write",
+    "check": "biome check src",
     "clean": "rm -rf build dist",
     "toolchain:check": "./scripts/check-toolchain.sh",
-    "toolchain:setup": "./scripts/setup-emsdk.sh",
-    "test": "echo 'TODO: Add tests'"
+    "toolchain:setup": "./scripts/setup-emsdk.sh"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.0",
+    "@types/bun": "latest",
+    "typescript": "^5.6.0"
   },
   "repository": {
     "type": "git",
