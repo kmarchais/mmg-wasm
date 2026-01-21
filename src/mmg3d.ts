@@ -5,6 +5,8 @@
  * Uses Emscripten's cwrap to call the C wrapper functions.
  */
 
+import type { WasmModule } from "./memory";
+
 /**
  * Integer parameters for MMG3D (matching MMG3D_Param enum in libmmg3d.h)
  */
@@ -75,7 +77,7 @@ export const MMG_RETURN_CODES = {
 } as const;
 
 /** Internal module interface (raw Emscripten functions) */
-interface MMG3DModule {
+export interface MMG3DModule extends WasmModule {
   _mmg3d_init(): number;
   _mmg3d_free(handle: number): number;
   _mmg3d_get_available_handles(): number;
@@ -145,11 +147,6 @@ interface MMG3DModule {
   _mmg3d_set_dparameter(handle: number, dparam: number, val: number): number;
   _mmg3d_remesh(handle: number): number;
   _mmg3d_free_array(ptr: number): void;
-  _malloc(size: number): number;
-  _free(ptr: number): void;
-  HEAPU8: Uint8Array;
-  HEAPF64: Float64Array;
-  HEAP32: Int32Array;
   getValue(ptr: number, type: string): number;
   setValue(ptr: number, value: number, type: string): void;
 }
@@ -166,11 +163,9 @@ export async function initMMG3D(): Promise<void> {
   }
 
   // Dynamic import of the Emscripten-generated module
-  // Note: Using build2 temporarily due to permission issues with build/
-  // Once permissions are fixed, rebuild to build/ and update this path
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore - Emscripten module doesn't have TypeScript declarations
-  const createModule = (await import("../build2/dist/mmg.js")).default;
+  const createModule = (await import("../build/dist/mmg.js")).default;
   module = (await createModule()) as MMG3DModule;
 }
 

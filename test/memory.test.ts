@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeAll } from "bun:test";
-import { initMMG3D, getWasmModule } from "../src/mmg3d";
+import { initMMG3D, getWasmModule, type MMG3DModule } from "../src/mmg3d";
 import {
   toWasmFloat64,
   toWasmInt32,
@@ -9,15 +9,14 @@ import {
   fromWasmUint32,
   freeWasmArray,
   getMemoryStats,
-  type WasmModule,
 } from "../src/memory";
 
 describe("Memory Utilities", () => {
-  let module: WasmModule;
+  let module: MMG3DModule;
 
   beforeAll(async () => {
     await initMMG3D();
-    module = getWasmModule() as WasmModule;
+    module = getWasmModule();
   });
 
   describe("toWasmFloat64", () => {

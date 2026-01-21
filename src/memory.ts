@@ -136,7 +136,7 @@ export function toWasmUint32(module: WasmModule, data: Uint32Array): number {
     );
   }
 
-  // Copy data to WASM heap using a Uint32Array view on the heap buffer
+  // Copy data to WASM heap (create Uint32Array view since HEAPU32 may not be exported)
   const heapU32 = new Uint32Array(module.HEAPU8.buffer, ptr, data.length);
   heapU32.set(data);
   return ptr;

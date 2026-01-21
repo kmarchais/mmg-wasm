@@ -13,6 +13,7 @@ export {
   type MeshSize,
   type IParamKey,
   type DParamKey,
+  type MMG3DModule,
 } from "./mmg3d";
 
 // Export memory utilities
