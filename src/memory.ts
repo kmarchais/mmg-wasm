@@ -382,29 +382,41 @@ export function fromWasmUint32(
  * ```
  */
 export function freeWasmArray(module: WasmModule, ptr: number): void {
-  if (ptr !== 0) {
-    const tracker = trackers.get(module);
-    if (tracker) {
-      const record = tracker.allocations.get(ptr);
-      if (record) {
-        tracker.totalAllocated -= record.size;
-        tracker.allocations.delete(ptr);
-
-        if (tracker.config.verbose) {
-          console.log(
-            `[mmg-wasm] Freed ${record.size} bytes, total: ${tracker.totalAllocated} bytes`,
-          );
-        }
-
-        // Reset warning flag if usage falls below threshold
-        const usagePercent = tracker.totalAllocated / DEFAULT_HEAP_MAX;
-        if (usagePercent < tracker.config.warnThreshold) {
-          tracker.hasWarned = false;
-        }
-      }
-    }
-    module._free(ptr);
+  // Early return for null pointer (idempotent)
+  if (ptr === 0) {
+    return;
   }
+
+  // Only free if we have a tracker for this module
+  const tracker = trackers.get(module);
+  if (!tracker) {
+    return;
+  }
+
+  // Only free if the pointer is tracked (prevents double-free UB)
+  const record = tracker.allocations.get(ptr);
+  if (!record) {
+    return;
+  }
+
+  // Update tracking
+  tracker.totalAllocated -= record.size;
+  tracker.allocations.delete(ptr);
+
+  if (tracker.config.verbose) {
+    console.log(
+      `[mmg-wasm] Freed ${record.size} bytes, total: ${tracker.totalAllocated} bytes`,
+    );
+  }
+
+  // Reset warning flag if usage falls below threshold
+  const usagePercent = tracker.totalAllocated / DEFAULT_HEAP_MAX;
+  if (usagePercent < tracker.config.warnThreshold) {
+    tracker.hasWarned = false;
+  }
+
+  // Actually free the memory
+  module._free(ptr);
 }
 
 /**

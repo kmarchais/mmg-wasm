@@ -855,4 +855,330 @@ describe("Memory Utilities", () => {
       }
     });
   });
+
+  describe("Random data round-trip", () => {
+    beforeEach(() => {
+      resetMemoryTracking(module);
+    });
+
+    it("should round-trip random Float64 data without loss", () => {
+      const size = 1000;
+      const original = new Float64Array(size);
+      for (let i = 0; i < size; i++) {
+        original[i] = Math.random() * 1000 - 500; // Random values in [-500, 500)
+      }
+
+      const ptr = toWasmFloat64(module, original);
+
+      try {
+        const result = fromWasmFloat64(module, ptr, original.length);
+
+        expect(result.length).toBe(original.length);
+        for (let i = 0; i < original.length; i++) {
+          expect(result[i]).toBe(original[i]);
+        }
+      } finally {
+        freeWasmArray(module, ptr);
+      }
+    });
+
+    it("should round-trip random Int32 data without loss", () => {
+      const size = 1000;
+      const original = new Int32Array(size);
+      for (let i = 0; i < size; i++) {
+        original[i] = Math.floor(Math.random() * 0xffffffff) - 0x7fffffff;
+      }
+
+      const ptr = toWasmInt32(module, original);
+
+      try {
+        const result = fromWasmInt32(module, ptr, original.length);
+
+        expect(result.length).toBe(original.length);
+        for (let i = 0; i < original.length; i++) {
+          expect(result[i]).toBe(original[i]);
+        }
+      } finally {
+        freeWasmArray(module, ptr);
+      }
+    });
+
+    it("should round-trip random Uint32 data without loss", () => {
+      const size = 1000;
+      const original = new Uint32Array(size);
+      for (let i = 0; i < size; i++) {
+        original[i] = Math.floor(Math.random() * 0xffffffff);
+      }
+
+      const ptr = toWasmUint32(module, original);
+
+      try {
+        const result = fromWasmUint32(module, ptr, original.length);
+
+        expect(result.length).toBe(original.length);
+        for (let i = 0; i < original.length; i++) {
+          expect(result[i]).toBe(original[i]);
+        }
+      } finally {
+        freeWasmArray(module, ptr);
+      }
+    });
+  });
+
+  describe("Memory Leak Detection", () => {
+    beforeEach(() => {
+      resetMemoryTracking(module);
+    });
+
+    it("should not leak memory in alloc/free cycles (100 iterations, 10K floats each)", () => {
+      const iterations = 100;
+      const elementsPerIteration = 10000; // 80KB per iteration
+
+      const statsBefore = getMemoryStats(module);
+
+      for (let i = 0; i < iterations; i++) {
+        const data = new Float64Array(elementsPerIteration);
+        for (let j = 0; j < elementsPerIteration; j++) {
+          data[j] = i * elementsPerIteration + j;
+        }
+
+        const ptr = toWasmFloat64(module, data);
+        freeWasmArray(module, ptr);
+      }
+
+      const statsAfter = getMemoryStats(module);
+
+      // Tracked memory should return to zero
+      expect(statsAfter.heapUsed).toBe(statsBefore.heapUsed);
+    });
+
+    it("should not leak memory in mixed alloc/free cycles", () => {
+      const iterations = 50;
+
+      const statsBefore = getMemoryStats(module);
+
+      for (let i = 0; i < iterations; i++) {
+        // Allocate multiple arrays of different types
+        const floatData = new Float64Array(1000);
+        const intData = new Int32Array(1000);
+        const uintData = new Uint32Array(1000);
+
+        const ptrFloat = toWasmFloat64(module, floatData);
+        const ptrInt = toWasmInt32(module, intData);
+        const ptrUint = toWasmUint32(module, uintData);
+
+        // Free in different order than allocation
+        freeWasmArray(module, ptrInt);
+        freeWasmArray(module, ptrUint);
+        freeWasmArray(module, ptrFloat);
+      }
+
+      const statsAfter = getMemoryStats(module);
+
+      // Tracked memory should return to zero
+      expect(statsAfter.heapUsed).toBe(statsBefore.heapUsed);
+    });
+
+    it("should track correct memory usage during multiple allocations", () => {
+      const allocations: number[] = [];
+      const expectedSizes = [8000, 4000, 4000]; // Float64(1000), Int32(1000), Uint32(1000)
+
+      // Allocate arrays
+      const float64Data = new Float64Array(1000);
+      const int32Data = new Int32Array(1000);
+      const uint32Data = new Uint32Array(1000);
+
+      allocations.push(toWasmFloat64(module, float64Data));
+      expect(getMemoryStats(module).heapUsed).toBe(8000);
+
+      allocations.push(toWasmInt32(module, int32Data));
+      expect(getMemoryStats(module).heapUsed).toBe(12000);
+
+      allocations.push(toWasmUint32(module, uint32Data));
+      expect(getMemoryStats(module).heapUsed).toBe(16000);
+
+      // Free and verify tracking decreases correctly
+      freeWasmArray(module, allocations[1]); // Free int32
+      expect(getMemoryStats(module).heapUsed).toBe(12000);
+
+      freeWasmArray(module, allocations[0]); // Free float64
+      expect(getMemoryStats(module).heapUsed).toBe(4000);
+
+      freeWasmArray(module, allocations[2]); // Free uint32
+      expect(getMemoryStats(module).heapUsed).toBe(0);
+    });
+  });
+
+  describe("Large allocation tests", () => {
+    beforeEach(() => {
+      resetMemoryTracking(module);
+    });
+
+    it("should handle large allocation (~80MB, 10 million floats)", () => {
+      const size = 10_000_000; // 10 million floats = ~80MB
+      const requiredBytes = size * 8;
+
+      // Check if we have enough memory headroom
+      const stats = getMemoryStats(module);
+      const available = stats.heapMax - stats.heapUsed;
+
+      if (available < requiredBytes * 1.5) {
+        // Skip test if insufficient memory (needs 1.5x for safety margin)
+        console.log(
+          `Skipping large allocation test: insufficient memory (${available} < ${requiredBytes * 1.5})`,
+        );
+        return;
+      }
+
+      const data = new Float64Array(size);
+      // Fill with pattern for verification
+      for (let i = 0; i < size; i += 1000) {
+        data[i] = i;
+      }
+
+      const ptr = toWasmFloat64(module, data);
+
+      try {
+        expect(ptr).toBeGreaterThan(0);
+
+        // Spot-check data integrity
+        const result = fromWasmFloat64(module, ptr, size);
+        expect(result[0]).toBe(0);
+        expect(result[1000]).toBe(1000);
+        expect(result[5_000_000]).toBe(5_000_000);
+        expect(result[9_999_000]).toBe(9_999_000);
+
+        // Verify tracking
+        const statsAfterAlloc = getMemoryStats(module);
+        expect(statsAfterAlloc.heapUsed).toBe(requiredBytes);
+      } finally {
+        freeWasmArray(module, ptr);
+      }
+
+      // Verify cleanup
+      const statsAfterFree = getMemoryStats(module);
+      expect(statsAfterFree.heapUsed).toBe(0);
+    });
+
+    it("should handle large Int32 allocation (~40MB)", () => {
+      const size = 10_000_000; // 10 million ints = ~40MB
+      const requiredBytes = size * 4;
+
+      const stats = getMemoryStats(module);
+      const available = stats.heapMax - stats.heapUsed;
+
+      if (available < requiredBytes * 1.5) {
+        console.log(
+          `Skipping large Int32 allocation test: insufficient memory`,
+        );
+        return;
+      }
+
+      const data = new Int32Array(size);
+      for (let i = 0; i < size; i += 1000) {
+        data[i] = i;
+      }
+
+      const ptr = toWasmInt32(module, data);
+
+      try {
+        expect(ptr).toBeGreaterThan(0);
+
+        const result = fromWasmInt32(module, ptr, size);
+        expect(result[0]).toBe(0);
+        expect(result[1000]).toBe(1000);
+        expect(result[5_000_000]).toBe(5_000_000);
+      } finally {
+        freeWasmArray(module, ptr);
+      }
+
+      expect(getMemoryStats(module).heapUsed).toBe(0);
+    });
+  });
+
+  describe("Double-free safety", () => {
+    beforeEach(() => {
+      resetMemoryTracking(module);
+    });
+
+    it("should be a no-op when freeing the same pointer twice", () => {
+      const data = new Float64Array([1.0, 2.0, 3.0]);
+      const ptr = toWasmFloat64(module, data);
+
+      // First free - should work
+      freeWasmArray(module, ptr);
+      expect(getMemoryStats(module).heapUsed).toBe(0);
+
+      // Second free - should be a no-op (not UB)
+      expect(() => freeWasmArray(module, ptr)).not.toThrow();
+      expect(getMemoryStats(module).heapUsed).toBe(0);
+    });
+
+    it("should be a no-op when freeing an untracked pointer", () => {
+      // Manually allocate memory without going through toWasm*
+      const ptr = module._malloc(100);
+      expect(ptr).toBeGreaterThan(0);
+
+      // freeWasmArray should be a no-op for untracked pointers
+      expect(() => freeWasmArray(module, ptr)).not.toThrow();
+
+      // Clean up manually (the memory is still allocated)
+      module._free(ptr);
+    });
+
+    it("should be safe to call freeWasmArray repeatedly on same pointer", () => {
+      const data = new Int32Array([1, 2, 3, 4, 5]);
+      const ptr = toWasmInt32(module, data);
+
+      // Free multiple times
+      expect(() => {
+        freeWasmArray(module, ptr);
+        freeWasmArray(module, ptr);
+        freeWasmArray(module, ptr);
+        freeWasmArray(module, ptr);
+        freeWasmArray(module, ptr);
+      }).not.toThrow();
+
+      expect(getMemoryStats(module).heapUsed).toBe(0);
+    });
+
+    it("should handle interleaved alloc/free/double-free correctly", () => {
+      const data1 = new Float64Array([1.0, 2.0]);
+      const data2 = new Float64Array([3.0, 4.0]);
+
+      const ptr1 = toWasmFloat64(module, data1);
+      const ptr2 = toWasmFloat64(module, data2);
+
+      expect(getMemoryStats(module).heapUsed).toBe(32); // 2 * 8 * 2
+
+      // Free ptr1 twice
+      freeWasmArray(module, ptr1);
+      freeWasmArray(module, ptr1);
+      expect(getMemoryStats(module).heapUsed).toBe(16);
+
+      // Free ptr2 normally
+      freeWasmArray(module, ptr2);
+      expect(getMemoryStats(module).heapUsed).toBe(0);
+
+      // Free both again (should be no-ops)
+      freeWasmArray(module, ptr1);
+      freeWasmArray(module, ptr2);
+      expect(getMemoryStats(module).heapUsed).toBe(0);
+    });
+
+    it("should not free when no tracker exists for module", () => {
+      // Create a mock module-like object
+      const mockModule = {
+        _malloc: (size: number) => 1000,
+        _free: mock(() => {}),
+        HEAPU8: new Uint8Array(1024),
+        HEAPF64: new Float64Array(128),
+        HEAP32: new Int32Array(256),
+      };
+
+      // freeWasmArray should not call _free since there's no tracker
+      freeWasmArray(mockModule, 1000);
+      expect(mockModule._free).not.toHaveBeenCalled();
+    });
+  });
 });
