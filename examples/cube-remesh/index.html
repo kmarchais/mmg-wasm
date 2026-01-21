@@ -196,17 +196,18 @@
     });
 
     // Load WASM module
+    // Uses relative path - works both locally (with copied build) and on GitHub Pages
     async function initModule() {
       try {
-        const createModule = (await import('../../build/dist/mmg.js')).default;
+        const createModule = (await import('./mmg.js')).default;
         Module = await createModule();
         statusEl.textContent = 'Ready to remesh';
         statusEl.className = 'status success';
         remeshBtn.disabled = false;
       } catch (err) {
-        statusEl.textContent = `Failed to load: ${err.message}`;
+        statusEl.textContent = `Failed to load WASM module. Run 'bun run build' first, then 'bun run example'.`;
         statusEl.className = 'status error';
-        console.error(err);
+        console.error('WASM load error:', err);
       }
     }
 
