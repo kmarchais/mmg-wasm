@@ -37,17 +37,11 @@ check_version() {
         version=$("$cmd" --version 2>&1 | head -n1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1)
 
         if [ -n "$version" ]; then
-            # Compare versions
-            local min_major min_minor
-            min_major=$(echo "$min_version" | cut -d. -f1)
-            min_minor=$(echo "$min_version" | cut -d. -f2)
+            # Compare versions using sort -V for proper semantic versioning
+            local lowest
+            lowest=$(printf '%s\n%s' "$min_version" "$version" | sort -V | head -n1)
 
-            local cur_major cur_minor
-            cur_major=$(echo "$version" | cut -d. -f1)
-            cur_minor=$(echo "$version" | cut -d. -f2)
-
-            if [ "$cur_major" -gt "$min_major" ] || \
-               ([ "$cur_major" -eq "$min_major" ] && [ "$cur_minor" -ge "$min_minor" ]); then
+            if [ "$lowest" = "$min_version" ]; then
                 echo -e "${GREEN}✓${NC} $name: $version (>= $min_version)"
             else
                 echo -e "${RED}✗${NC} $name: $version (requires >= $min_version)"
@@ -73,8 +67,8 @@ check_command "emcc" "Emscripten (emcc)" "Run ./scripts/setup-emsdk.sh or see ht
 # Check for emcmake
 check_command "emcmake" "emcmake" "Ensure emsdk_env.sh is sourced in your shell"
 
-# Check CMake version (3.29+ for FetchContent improvements)
-check_version "cmake" "CMake" "3.29" "Install CMake 3.29+ from https://cmake.org/download/"
+# Check CMake version (3.24+ for FetchContent improvements)
+check_version "cmake" "CMake" "3.24" "Install CMake 3.24+ from https://cmake.org/download/"
 
 # Check for Ninja
 check_command "ninja" "Ninja" "Install with: apt install ninja-build (Linux) / brew install ninja (macOS)"

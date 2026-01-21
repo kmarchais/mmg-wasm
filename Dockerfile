@@ -24,7 +24,9 @@ WORKDIR /app
 COPY . .
 
 # Install Node dependencies (for package.json scripts)
-RUN bun install --frozen-lockfile || bun install
+# Try frozen lockfile first, fall back with warning if it fails
+RUN bun install --frozen-lockfile || \
+    (echo "WARNING: bun.lockb mismatch, installing without frozen lockfile" && bun install)
 
 # Default command: run the build
 CMD ["bun", "run", "build"]

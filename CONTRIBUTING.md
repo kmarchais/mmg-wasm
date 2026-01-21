@@ -2,9 +2,9 @@
 
 ## Prerequisites
 
-- **CMake** 3.29 or higher
+- **CMake** 3.24 or higher
 - **Ninja** build system
-- **Emscripten SDK** 4.0.10 or higher
+- **Emscripten SDK** (see version in `.github/workflows/build.yml`)
 - **Bun** (for package management and scripts)
 
 ## Development Setup
@@ -42,11 +42,11 @@ source ~/.emsdk/emsdk_env.sh
 If you prefer to manage Emscripten yourself:
 
 ```bash
-# Install emsdk manually
+# Install emsdk manually (check .github/workflows/build.yml for current version)
 git clone https://github.com/emscripten-core/emsdk.git
 cd emsdk
-./emsdk install 4.0.10
-./emsdk activate 4.0.10
+./emsdk install latest  # or specific version from CI workflow
+./emsdk activate latest
 source ./emsdk_env.sh
 
 # Then build mmg-wasm
@@ -111,7 +111,7 @@ Or use Docker: `bun run build:docker`
 
 ### CMake version too old
 
-CMake 3.29+ is required for FetchContent improvements. Install from:
+CMake 3.24+ is required for FetchContent improvements. Install from:
 - https://cmake.org/download/
 - Or via package manager: `brew install cmake` (macOS) / `snap install cmake` (Linux)
 

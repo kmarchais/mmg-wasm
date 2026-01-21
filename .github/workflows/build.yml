@@ -47,7 +47,7 @@ jobs:
           path: |
             build/dist/*.js
             build/dist/*.wasm
-          if-no-files-found: ignore
+          if-no-files-found: warn
 
   toolchain-check:
     runs-on: ubuntu-latest

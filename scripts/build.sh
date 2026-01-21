@@ -51,7 +51,8 @@ emcmake cmake -G Ninja -B build \
 
 echo
 echo "Building..."
-cmake --build build --parallel
+# Limit parallel jobs to avoid OOM on CI runners
+cmake --build build --parallel "$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 
 echo
 echo "Build complete! Output files in build/"

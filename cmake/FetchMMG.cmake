@@ -40,9 +40,14 @@ set(MMG_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 
 # Disable Fortran header generation - genheader.js can't run Perl via system()
 # in WASM environment, and we don't need Fortran bindings anyway
+# Save current value to restore after mmg configuration
+set(_MMG_WASM_SAVED_DISABLE_PERL ${CMAKE_DISABLE_FIND_PACKAGE_Perl})
 set(CMAKE_DISABLE_FIND_PACKAGE_Perl TRUE)
 
 # Fetch and make available
 FetchContent_MakeAvailable(mmg)
+
+# Restore original Perl setting
+set(CMAKE_DISABLE_FIND_PACKAGE_Perl ${_MMG_WASM_SAVED_DISABLE_PERL})
 
 message(STATUS "mmg ${MMG_VERSION} configured")

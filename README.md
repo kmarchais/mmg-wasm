@@ -4,15 +4,15 @@ WebAssembly bindings for the [mmg](https://www.mmgtools.org/) mesh remeshing lib
 
 ## Status
 
-Work in progress
+🚧 **Work in progress** - Not yet ready for production use.
 
 ## Quick Start
 
 ### Prerequisites
 
 - [Bun](https://bun.sh/) (package manager)
-- [Emscripten SDK](https://emscripten.org/) 4.0.10+ (or use Docker)
-- CMake 3.29+
+- [Emscripten SDK](https://emscripten.org/) (or use Docker)
+- CMake 3.24+
 - Ninja
 
 ### Build
