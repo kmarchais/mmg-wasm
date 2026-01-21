@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mmg-wasm - Mesh Remeshing Examples</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <h1>mmg-wasm Mesh Remeshing</h1>
+  <p class="subtitle">WebAssembly bindings for the MMG mesh adaptation library</p>
+
+  <div id="status" class="status loading">Loading WASM module...</div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="2d">2D Square (MMG2D)</button>
+    <button class="tab" data-tab="3d">3D Cube (MMG3D)</button>
+  </div>
+
+  <!-- 2D Tab Content -->
+  <div id="tab-2d" class="tab-content active">
+    <div class="info-box">
+      Remesh a unit square using MMG2D for 2D triangular mesh adaptation.
+    </div>
+    <div class="main-content">
+      <div class="left-panel">
+        <div class="controls">
+          <div class="slider-group">
+            <label for="hmax2d">Maximum edge length (hmax)</label>
+            <input type="range" id="hmax2d" min="0.05" max="0.5" step="0.01" value="0.15">
+            <div class="slider-value">hmax = <span id="hmaxValue2d">0.15</span></div>
+          </div>
+        </div>
+
+        <div class="results">
+          <h2>Mesh Statistics</h2>
+          <table>
+            <thead>
+              <tr><th>Metric</th><th>Before</th><th>After</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Vertices</td><td id="vertices2dBefore">-</td><td id="vertices2dAfter">-</td></tr>
+              <tr><td>Triangles</td><td id="tri2dBefore">-</td><td id="tri2dAfter">-</td></tr>
+              <tr><td>Edges</td><td id="edges2dBefore">-</td><td id="edges2dAfter">-</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="right-panel">
+        <div class="visualization">
+          <h2>Mesh Visualization</h2>
+          <div class="canvas-container">
+            <div class="canvas-wrapper">
+              <p>Before</p>
+              <canvas id="canvas2dBefore" width="200" height="200"></canvas>
+            </div>
+            <div class="canvas-wrapper">
+              <p>After</p>
+              <canvas id="canvas2dAfter" width="200" height="200"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3D Tab Content -->
+  <div id="tab-3d" class="tab-content">
+    <div class="info-box">
+      Remesh a unit cube using MMG3D for 3D tetrahedral mesh adaptation.
+    </div>
+    <div class="main-content">
+      <div class="left-panel">
+        <div class="controls">
+          <div class="slider-group">
+            <label for="hmax3d">Maximum edge length (hmax)</label>
+            <input type="range" id="hmax3d" min="0.1" max="1.0" step="0.05" value="0.3">
+            <div class="slider-value">hmax = <span id="hmaxValue3d">0.3</span></div>
+          </div>
+          <div class="checkbox-group" style="margin-bottom: 16px;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="liveRemesh3d" style="width: auto;">
+              <span style="font-weight: normal;">Live remesh (update while dragging)</span>
+            </label>
+          </div>
+          <button id="remeshBtn3d" disabled>Remesh 3D</button>
+        </div>
+
+        <div class="results">
+          <h2>Mesh Statistics</h2>
+          <table>
+            <thead>
+              <tr><th>Metric</th><th>Before</th><th>After</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Vertices</td><td id="vertices3dBefore">-</td><td id="vertices3dAfter">-</td></tr>
+              <tr><td>Tetrahedra</td><td id="tetra3dBefore">-</td><td id="tetra3dAfter">-</td></tr>
+              <tr><td>Triangles</td><td id="tri3dBefore">-</td><td id="tri3dAfter">-</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="right-panel">
+        <div class="visualization">
+          <h2>Mesh Statistics (No 3D Visualization)</h2>
+          <div style="padding: 40px; text-align: center; color: #666;">
+            <p>3D visualization requires a WebGL library like Three.js.</p>
+            <p>The remeshing still works - check the statistics!</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // ============== Mesh Data ==============
+
+    // 2D Square mesh
+    const squareVertices = new Float64Array([
+      0.0, 0.0,  // 1: origin
+      1.0, 0.0,  // 2: +x
+      1.0, 1.0,  // 3: +x+y
+      0.0, 1.0,  // 4: +y
+    ]);
+    const squareTriangles = new Int32Array([
+      1, 2, 3,  // T1: lower-right
+      1, 3, 4,  // T2: upper-left
+    ]);
+    const squareEdges = new Int32Array([
+      1, 2,  // bottom
+      2, 3,  // right
+      3, 4,  // top
+      4, 1,  // left
+    ]);
+    const square = { nVertices: 4, nTriangles: 2, nEdges: 4 };
+
+    // 3D Cube mesh
+    const cubeVertices = new Float64Array([
+      0.0, 0.0, 0.0,  // 1
+      1.0, 0.0, 0.0,  // 2
+      1.0, 1.0, 0.0,  // 3
+      0.0, 1.0, 0.0,  // 4
+      0.0, 0.0, 1.0,  // 5
+      1.0, 0.0, 1.0,  // 6
+      1.0, 1.0, 1.0,  // 7
+      0.0, 1.0, 1.0,  // 8
+    ]);
+    const cubeTetrahedra = new Int32Array([
+      1, 2, 3, 7,
+      1, 3, 4, 7,
+      1, 4, 8, 7,
+      1, 8, 5, 7,
+      1, 5, 6, 7,
+      1, 6, 2, 7,
+    ]);
+    const cubeTriangles = new Int32Array([
+      1, 3, 2, 1, 4, 3,
+      5, 6, 7, 5, 7, 8,
+      1, 2, 6, 1, 6, 5,
+      3, 8, 4, 3, 7, 8,
+      1, 5, 8, 1, 8, 4,
+      2, 3, 7, 2, 7, 6,
+    ]);
+    const cube = { nVertices: 8, nTetrahedra: 6, nTriangles: 12 };
+
+    // ============== Parameters ==============
+    const DPARAM_2D_HMAX = 24;
+    const IPARAM_2D_VERBOSE = 0;
+    const DPARAM_3D_HMAX = 28;
+    const IPARAM_3D_VERBOSE = 0;
+
+    let Module = null;
+
+    // ============== Tab Switching ==============
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+      });
+    });
+
+    // ============== 2D Canvas Drawing ==============
+    function drawMesh2D(canvas, vertices, triangles, nVerts, nTris) {
+      const ctx = canvas.getContext('2d');
+      const padding = 20;
+      const scale = canvas.width - 2 * padding;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const transformX = (x) => padding + x * scale;
+      const transformY = (y) => canvas.height - padding - y * scale;
+
+      // Draw triangles
+      ctx.strokeStyle = '#0066cc';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < nTris; i++) {
+        const v0 = triangles[i * 3] - 1;
+        const v1 = triangles[i * 3 + 1] - 1;
+        const v2 = triangles[i * 3 + 2] - 1;
+
+        ctx.beginPath();
+        ctx.moveTo(transformX(vertices[v0 * 2]), transformY(vertices[v0 * 2 + 1]));
+        ctx.lineTo(transformX(vertices[v1 * 2]), transformY(vertices[v1 * 2 + 1]));
+        ctx.lineTo(transformX(vertices[v2 * 2]), transformY(vertices[v2 * 2 + 1]));
+        ctx.closePath();
+        ctx.stroke();
+      }
+
+      // Draw vertices
+      ctx.fillStyle = '#dc3545';
+      for (let i = 0; i < nVerts; i++) {
+        ctx.beginPath();
+        ctx.arc(transformX(vertices[i * 2]), transformY(vertices[i * 2 + 1]), 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // ============== Module Loading ==============
+    async function initModule() {
+      const statusEl = document.getElementById('status');
+      try {
+        const createModule = (await import('./mmg.js')).default;
+        Module = await createModule();
+        statusEl.textContent = 'Ready to remesh';
+        statusEl.className = 'status success';
+
+        document.getElementById('remeshBtn3d').disabled = false;
+
+        // Draw initial 2D mesh
+        drawMesh2D(document.getElementById('canvas2dBefore'), squareVertices, squareTriangles, square.nVertices, square.nTriangles);
+        document.getElementById('vertices2dBefore').textContent = square.nVertices;
+        document.getElementById('tri2dBefore').textContent = square.nTriangles;
+        document.getElementById('edges2dBefore').textContent = square.nEdges;
+
+        // Set initial 3D stats
+        document.getElementById('vertices3dBefore').textContent = cube.nVertices;
+        document.getElementById('tetra3dBefore').textContent = cube.nTetrahedra;
+        document.getElementById('tri3dBefore').textContent = cube.nTriangles;
+      } catch (err) {
+        statusEl.textContent = `Failed to load WASM module. Run 'bun run build' first.`;
+        statusEl.className = 'status error';
+        console.error('WASM load error:', err);
+      }
+    }
+
+    // ============== 2D Remeshing ==============
+    async function remesh2D() {
+      if (!Module) return;
+
+      const hmax = parseFloat(document.getElementById('hmax2d').value);
+      const statusEl = document.getElementById('status');
+
+      try {
+        const handle = Module._mmg2d_init();
+        if (handle < 0) throw new Error('Failed to initialize mesh');
+
+        try {
+          let result = Module._mmg2d_set_mesh_size(handle, square.nVertices, square.nTriangles, 0, square.nEdges);
+          if (result !== 1) throw new Error('Failed to set mesh size');
+
+          const verticesPtr = Module._malloc(squareVertices.byteLength);
+          Module.HEAPF64.set(squareVertices, verticesPtr / 8);
+          result = Module._mmg2d_set_vertices(handle, verticesPtr, 0);
+          Module._free(verticesPtr);
+          if (result !== 1) throw new Error('Failed to set vertices');
+
+          const triPtr = Module._malloc(squareTriangles.byteLength);
+          Module.HEAP32.set(squareTriangles, triPtr / 4);
+          result = Module._mmg2d_set_triangles(handle, triPtr, 0);
+          Module._free(triPtr);
+          if (result !== 1) throw new Error('Failed to set triangles');
+
+          const edgePtr = Module._malloc(squareEdges.byteLength);
+          Module.HEAP32.set(squareEdges, edgePtr / 4);
+          result = Module._mmg2d_set_edges(handle, edgePtr, 0);
+          Module._free(edgePtr);
+          if (result !== 1) throw new Error('Failed to set edges');
+
+          Module._mmg2d_set_iparameter(handle, IPARAM_2D_VERBOSE, -1);
+          Module._mmg2d_set_dparameter(handle, DPARAM_2D_HMAX, hmax);
+
+          result = Module._mmg2d_remesh(handle);
+          if (result !== 0) console.warn(`Remeshing returned code ${result}`);
+
+          // Get output size
+          const sizePtr = Module._malloc(4 * 4);
+          Module._mmg2d_get_mesh_size(handle, sizePtr, sizePtr + 4, sizePtr + 8, sizePtr + 12);
+          const newVertices = Module.getValue(sizePtr, 'i32');
+          const newTri = Module.getValue(sizePtr + 4, 'i32');
+          const newEdges = Module.getValue(sizePtr + 12, 'i32');
+          Module._free(sizePtr);
+
+          // Get output vertices
+          const countPtr = Module._malloc(4);
+          const outVerticesPtr = Module._mmg2d_get_vertices(handle, countPtr);
+          const vertexCount = Module.getValue(countPtr, 'i32');
+          Module._free(countPtr);
+
+          let outputVertices = null;
+          if (outVerticesPtr && vertexCount > 0) {
+            outputVertices = new Float64Array(vertexCount * 2);
+            outputVertices.set(Module.HEAPF64.subarray(outVerticesPtr / 8, outVerticesPtr / 8 + vertexCount * 2));
+            Module._mmg2d_free_array(outVerticesPtr);
+          }
+
+          // Get output triangles
+          const triCountPtr = Module._malloc(4);
+          const outTriPtr = Module._mmg2d_get_triangles(handle, triCountPtr);
+          const triCount = Module.getValue(triCountPtr, 'i32');
+          Module._free(triCountPtr);
+
+          let outputTriangles = null;
+          if (outTriPtr && triCount > 0) {
+            outputTriangles = new Int32Array(triCount * 3);
+            outputTriangles.set(Module.HEAP32.subarray(outTriPtr / 4, outTriPtr / 4 + triCount * 3));
+            Module._mmg2d_free_array(outTriPtr);
+          }
+
+          document.getElementById('vertices2dAfter').textContent = newVertices;
+          document.getElementById('tri2dAfter').textContent = newTri;
+          document.getElementById('edges2dAfter').textContent = newEdges;
+
+          if (outputVertices && outputTriangles) {
+            drawMesh2D(document.getElementById('canvas2dAfter'), outputVertices, outputTriangles, newVertices, newTri);
+          }
+
+          statusEl.textContent = `2D Remeshing complete (hmax=${hmax})`;
+          statusEl.className = 'status success';
+
+        } finally {
+          Module._mmg2d_free(handle);
+        }
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+        statusEl.className = 'status error';
+        console.error(err);
+      }
+    }
+
+    // ============== 3D Remeshing ==============
+    async function remesh3D() {
+      if (!Module) return;
+
+      const hmax = parseFloat(document.getElementById('hmax3d').value);
+      const btn = document.getElementById('remeshBtn3d');
+      const statusEl = document.getElementById('status');
+
+      btn.disabled = true;
+      statusEl.textContent = 'Remeshing 3D...';
+      statusEl.className = 'status loading';
+
+      document.getElementById('vertices3dAfter').textContent = '-';
+      document.getElementById('tetra3dAfter').textContent = '-';
+      document.getElementById('tri3dAfter').textContent = '-';
+
+      await new Promise(r => requestAnimationFrame(r));
+
+      try {
+        const handle = Module._mmg3d_init();
+        if (handle < 0) throw new Error('Failed to initialize mesh');
+
+        try {
+          let result = Module._mmg3d_set_mesh_size(handle, cube.nVertices, cube.nTetrahedra, 0, cube.nTriangles, 0, 0);
+          if (result !== 1) throw new Error('Failed to set mesh size');
+
+          const verticesPtr = Module._malloc(cubeVertices.byteLength);
+          Module.HEAPF64.set(cubeVertices, verticesPtr / 8);
+          result = Module._mmg3d_set_vertices(handle, verticesPtr, 0);
+          Module._free(verticesPtr);
+          if (result !== 1) throw new Error('Failed to set vertices');
+
+          const tetraPtr = Module._malloc(cubeTetrahedra.byteLength);
+          Module.HEAP32.set(cubeTetrahedra, tetraPtr / 4);
+          result = Module._mmg3d_set_tetrahedra(handle, tetraPtr, 0);
+          Module._free(tetraPtr);
+          if (result !== 1) throw new Error('Failed to set tetrahedra');
+
+          const triPtr = Module._malloc(cubeTriangles.byteLength);
+          Module.HEAP32.set(cubeTriangles, triPtr / 4);
+          result = Module._mmg3d_set_triangles(handle, triPtr, 0);
+          Module._free(triPtr);
+          if (result !== 1) throw new Error('Failed to set triangles');
+
+          Module._mmg3d_set_iparameter(handle, IPARAM_3D_VERBOSE, -1);
+          Module._mmg3d_set_dparameter(handle, DPARAM_3D_HMAX, hmax);
+
+          result = Module._mmg3d_remesh(handle);
+          if (result !== 0) console.warn(`Remeshing returned code ${result}`);
+
+          // Get output size
+          const sizePtr = Module._malloc(6 * 4);
+          Module._mmg3d_get_mesh_size(handle, sizePtr, sizePtr + 4, sizePtr + 8, sizePtr + 12, sizePtr + 16, sizePtr + 20);
+          const newVertices = Module.getValue(sizePtr, 'i32');
+          const newTetra = Module.getValue(sizePtr + 4, 'i32');
+          const newTri = Module.getValue(sizePtr + 12, 'i32');
+          Module._free(sizePtr);
+
+          document.getElementById('vertices3dAfter').textContent = newVertices;
+          document.getElementById('tetra3dAfter').textContent = newTetra;
+          document.getElementById('tri3dAfter').textContent = newTri;
+
+          statusEl.textContent = `3D Remeshing complete (hmax=${hmax})`;
+          statusEl.className = 'status success';
+
+        } finally {
+          Module._mmg3d_free(handle);
+        }
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+        statusEl.className = 'status error';
+        console.error(err);
+      }
+
+      btn.disabled = false;
+    }
+
+    // ============== Event Listeners ==============
+
+    // Debounce for 2D slider - remesh automatically with slight delay
+    let remesh2DTimeout = null;
+    let isRemeshing2D = false;
+
+    document.getElementById('hmax2d').addEventListener('input', (e) => {
+      document.getElementById('hmaxValue2d').textContent = e.target.value;
+
+      // Clear any pending remesh
+      if (remesh2DTimeout) {
+        clearTimeout(remesh2DTimeout);
+      }
+
+      // Debounce: wait 50ms after last input before remeshing
+      remesh2DTimeout = setTimeout(async () => {
+        if (!isRemeshing2D && Module) {
+          isRemeshing2D = true;
+          await remesh2D();
+          isRemeshing2D = false;
+        }
+      }, 50);
+    });
+
+    // 3D slider with optional live remeshing
+    let remesh3DTimeout = null;
+    let isRemeshing3D = false;
+
+    document.getElementById('hmax3d').addEventListener('input', (e) => {
+      document.getElementById('hmaxValue3d').textContent = e.target.value;
+
+      // Check if live remesh is enabled
+      if (document.getElementById('liveRemesh3d').checked) {
+        if (remesh3DTimeout) {
+          clearTimeout(remesh3DTimeout);
+        }
+        remesh3DTimeout = setTimeout(async () => {
+          if (!isRemeshing3D && Module) {
+            isRemeshing3D = true;
+            await remesh3D();
+            isRemeshing3D = false;
+          }
+        }, 50);
+      }
+    });
+
+    document.getElementById('remeshBtn3d').addEventListener('click', remesh3D);
+
+    // Initialize and run initial 2D remesh
+    initModule().then(() => {
+      if (Module) remesh2D();
+    });
+  </script>
+</body>
+</html>

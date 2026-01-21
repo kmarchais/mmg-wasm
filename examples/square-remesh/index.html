@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mmg-wasm Square Remeshing Example (2D)</title>
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <h1>mmg-wasm Square Remeshing (2D)</h1>
+  <p class="subtitle">Remesh a unit square with adjustable mesh density using MMG2D</p>
+
+  <div id="status" class="status loading">Loading WASM module...</div>
+
+  <div class="main-content">
+    <div class="left-panel">
+      <div class="controls">
+        <div class="slider-group">
+          <label for="hmax">Maximum edge length (hmax)</label>
+          <input type="range" id="hmax" min="0.05" max="0.5" step="0.01" value="0.15">
+          <div class="slider-value">hmax = <span id="hmaxValue">0.15</span></div>
+        </div>
+        <button id="remeshBtn" disabled>Remesh</button>
+      </div>
+
+      <div class="results">
+        <h2>Mesh Statistics</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Before</th>
+              <th>After</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Vertices</td>
+              <td id="verticesBefore">-</td>
+              <td id="verticesAfter">-</td>
+            </tr>
+            <tr>
+              <td>Triangles</td>
+              <td id="triBefore">-</td>
+              <td id="triAfter">-</td>
+            </tr>
+            <tr>
+              <td>Edges</td>
+              <td id="edgesBefore">-</td>
+              <td id="edgesAfter">-</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <div class="visualization">
+        <h2>Mesh Visualization</h2>
+        <div class="canvas-container">
+          <div class="canvas-wrapper">
+            <p>Before</p>
+            <canvas id="canvasBefore" width="200" height="200"></canvas>
+          </div>
+          <div class="canvas-wrapper">
+            <p>After</p>
+            <canvas id="canvasAfter" width="200" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      squareVertices,
+      squareTriangles,
+      squareEdges,
+      nVertices,
+      nTriangles,
+      nEdges
+    } from './square.js';
+
+    // DPARAM_2D.hmax index from mmg2d.ts
+    const DPARAM_2D_HMAX = 24;
+    // IPARAM_2D.verbose index
+    const IPARAM_2D_VERBOSE = 0;
+
+    let Module = null;
+
+    // DOM elements
+    const statusEl = document.getElementById('status');
+    const hmaxSlider = document.getElementById('hmax');
+    const hmaxValueEl = document.getElementById('hmaxValue');
+    const remeshBtn = document.getElementById('remeshBtn');
+    const canvasBefore = document.getElementById('canvasBefore');
+    const canvasAfter = document.getElementById('canvasAfter');
+
+    // Update slider display
+    hmaxSlider.addEventListener('input', () => {
+      hmaxValueEl.textContent = hmaxSlider.value;
+    });
+
+    // Draw mesh on canvas
+    function drawMesh(canvas, vertices, triangles, nVerts, nTris) {
+      const ctx = canvas.getContext('2d');
+      const padding = 20;
+      const scale = canvas.width - 2 * padding;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Transform coordinates: flip y-axis and apply padding
+      const transformX = (x) => padding + x * scale;
+      const transformY = (y) => canvas.height - padding - y * scale;
+
+      // Draw triangles
+      ctx.strokeStyle = '#0066cc';
+      ctx.lineWidth = 1;
+
+      for (let i = 0; i < nTris; i++) {
+        const v0 = triangles[i * 3] - 1;     // Convert to 0-indexed
+        const v1 = triangles[i * 3 + 1] - 1;
+        const v2 = triangles[i * 3 + 2] - 1;
+
+        const x0 = transformX(vertices[v0 * 2]);
+        const y0 = transformY(vertices[v0 * 2 + 1]);
+        const x1 = transformX(vertices[v1 * 2]);
+        const y1 = transformY(vertices[v1 * 2 + 1]);
+        const x2 = transformX(vertices[v2 * 2]);
+        const y2 = transformY(vertices[v2 * 2 + 1]);
+
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.closePath();
+        ctx.stroke();
+      }
+
+      // Draw vertices
+      ctx.fillStyle = '#dc3545';
+      for (let i = 0; i < nVerts; i++) {
+        const x = transformX(vertices[i * 2]);
+        const y = transformY(vertices[i * 2 + 1]);
+        ctx.beginPath();
+        ctx.arc(x, y, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Load WASM module
+    async function initModule() {
+      try {
+        const createModule = (await import('./mmg.js')).default;
+        Module = await createModule();
+        statusEl.textContent = 'Ready to remesh';
+        statusEl.className = 'status success';
+        remeshBtn.disabled = false;
+
+        // Draw initial mesh
+        drawMesh(canvasBefore, squareVertices, squareTriangles, nVertices, nTriangles);
+        document.getElementById('verticesBefore').textContent = nVertices;
+        document.getElementById('triBefore').textContent = nTriangles;
+        document.getElementById('edgesBefore').textContent = nEdges;
+      } catch (err) {
+        statusEl.textContent = `Failed to load WASM module. Run 'bun run build' first, then 'bun run example'.`;
+        statusEl.className = 'status error';
+        console.error('WASM load error:', err);
+      }
+    }
+
+    // Remesh function
+    async function remesh() {
+      if (!Module) return;
+
+      const hmax = parseFloat(hmaxSlider.value);
+      remeshBtn.disabled = true;
+      statusEl.textContent = 'Remeshing...';
+      statusEl.className = 'status loading';
+
+      // Clear after values
+      document.getElementById('verticesAfter').textContent = '-';
+      document.getElementById('triAfter').textContent = '-';
+      document.getElementById('edgesAfter').textContent = '-';
+
+      // Use requestAnimationFrame to allow UI update
+      await new Promise(r => requestAnimationFrame(r));
+
+      try {
+        // Initialize mesh
+        const handle = Module._mmg2d_init();
+        if (handle < 0) {
+          throw new Error('Failed to initialize mesh');
+        }
+
+        try {
+          // Set mesh size: np, nt, nquad, na
+          let result = Module._mmg2d_set_mesh_size(
+            handle,
+            nVertices,
+            nTriangles,
+            0, // nQuads
+            nEdges
+          );
+          if (result !== 1) throw new Error('Failed to set mesh size');
+
+          // Set vertices (2D: x, y pairs)
+          const verticesPtr = Module._malloc(squareVertices.byteLength);
+          Module.HEAPF64.set(squareVertices, verticesPtr / 8);
+          result = Module._mmg2d_set_vertices(handle, verticesPtr, 0);
+          Module._free(verticesPtr);
+          if (result !== 1) throw new Error('Failed to set vertices');
+
+          // Set triangles
+          const triPtr = Module._malloc(squareTriangles.byteLength);
+          Module.HEAP32.set(squareTriangles, triPtr / 4);
+          result = Module._mmg2d_set_triangles(handle, triPtr, 0);
+          Module._free(triPtr);
+          if (result !== 1) throw new Error('Failed to set triangles');
+
+          // Set edges
+          const edgePtr = Module._malloc(squareEdges.byteLength);
+          Module.HEAP32.set(squareEdges, edgePtr / 4);
+          result = Module._mmg2d_set_edges(handle, edgePtr, 0);
+          Module._free(edgePtr);
+          if (result !== 1) throw new Error('Failed to set edges');
+
+          // Set parameters
+          Module._mmg2d_set_iparameter(handle, IPARAM_2D_VERBOSE, -1); // Quiet
+          Module._mmg2d_set_dparameter(handle, DPARAM_2D_HMAX, hmax);
+
+          // Run remeshing
+          result = Module._mmg2d_remesh(handle);
+          if (result !== 0) {
+            console.warn(`Remeshing returned code ${result}`);
+          }
+
+          // Get output mesh size
+          const sizePtr = Module._malloc(4 * 4);
+          Module._mmg2d_get_mesh_size(
+            handle,
+            sizePtr,      // np
+            sizePtr + 4,  // nt
+            sizePtr + 8,  // nquad
+            sizePtr + 12  // na
+          );
+
+          const newVertices = Module.getValue(sizePtr, 'i32');
+          const newTri = Module.getValue(sizePtr + 4, 'i32');
+          const newEdges = Module.getValue(sizePtr + 12, 'i32');
+          Module._free(sizePtr);
+
+          // Get output vertices
+          const countPtr = Module._malloc(4);
+          const outVerticesPtr = Module._mmg2d_get_vertices(handle, countPtr);
+          const vertexCount = Module.getValue(countPtr, 'i32');
+          Module._free(countPtr);
+
+          let outputVertices = null;
+          if (outVerticesPtr && vertexCount > 0) {
+            outputVertices = new Float64Array(vertexCount * 2);
+            outputVertices.set(
+              Module.HEAPF64.subarray(outVerticesPtr / 8, outVerticesPtr / 8 + vertexCount * 2)
+            );
+            Module._mmg2d_free_array(outVerticesPtr);
+          }
+
+          // Get output triangles
+          const triCountPtr = Module._malloc(4);
+          const outTriPtr = Module._mmg2d_get_triangles(handle, triCountPtr);
+          const triCount = Module.getValue(triCountPtr, 'i32');
+          Module._free(triCountPtr);
+
+          let outputTriangles = null;
+          if (outTriPtr && triCount > 0) {
+            outputTriangles = new Int32Array(triCount * 3);
+            outputTriangles.set(
+              Module.HEAP32.subarray(outTriPtr / 4, outTriPtr / 4 + triCount * 3)
+            );
+            Module._mmg2d_free_array(outTriPtr);
+          }
+
+          // Update UI with results
+          document.getElementById('verticesAfter').textContent = newVertices;
+          document.getElementById('triAfter').textContent = newTri;
+          document.getElementById('edgesAfter').textContent = newEdges;
+
+          // Draw output mesh
+          if (outputVertices && outputTriangles) {
+            drawMesh(canvasAfter, outputVertices, outputTriangles, newVertices, newTri);
+          }
+
+          statusEl.textContent = `Remeshing complete (hmax=${hmax})`;
+          statusEl.className = 'status success';
+
+        } finally {
+          // Clean up
+          Module._mmg2d_free(handle);
+        }
+
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+        statusEl.className = 'status error';
+        console.error(err);
+      }
+
+      remeshBtn.disabled = false;
+    }
+
+    // Event listeners
+    remeshBtn.addEventListener('click', remesh);
+
+    // Initialize
+    initModule();
+  </script>
+</body>
+</html>
