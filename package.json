@@ -23,7 +23,8 @@
     "check": "biome check src",
     "clean": "rm -rf build dist",
     "toolchain:check": "./scripts/check-toolchain.sh",
-    "toolchain:setup": "./scripts/setup-emsdk.sh"
+    "toolchain:setup": "./scripts/setup-emsdk.sh",
+    "example": "cp build/dist/mmg.js build/dist/mmg.wasm examples/cube-remesh/ && bunx serve examples/cube-remesh -p 3000"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
