@@ -106,16 +106,10 @@
 
       <div class="right-panel">
         <div class="visualization">
-          <h2>Surface Visualization (Orthographic)</h2>
-          <div class="canvas-container">
-            <div class="canvas-wrapper">
-              <p>Before</p>
-              <canvas id="canvasSBefore" width="200" height="200"></canvas>
-            </div>
-            <div class="canvas-wrapper">
-              <p>After</p>
-              <canvas id="canvasSAfter" width="200" height="200"></canvas>
-            </div>
+          <h2>Visualization</h2>
+          <div style="padding: 40px; text-align: center; color: #666;">
+            <p>3D visualization is not supported yet.</p>
+            <p>The remeshing still works - check the statistics!</p>
           </div>
         </div>
       </div>
@@ -161,9 +155,9 @@
 
       <div class="right-panel">
         <div class="visualization">
-          <h2>Mesh Statistics (No 3D Visualization)</h2>
+          <h2>Visualization</h2>
           <div style="padding: 40px; text-align: center; color: #666;">
-            <p>3D visualization requires a WebGL library like Three.js.</p>
+            <p>3D visualization is not supported yet.</p>
             <p>The remeshing still works - check the statistics!</p>
           </div>
         </div>
@@ -301,57 +295,6 @@
       }
     }
 
-    // ============== Surface (3D) Canvas Drawing ==============
-    function drawMeshSurface(canvas, vertices, triangles, nVerts, nTris) {
-      const ctx = canvas.getContext('2d');
-      const padding = 20;
-      const size = canvas.width - 2 * padding;
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Orthographic projection with slight rotation for depth perception
-      // Project 3D to 2D: x' = x + 0.3*z, y' = y + 0.3*z
-      const projectX = (x, z) => padding + (x + 0.3 * z) * size * 0.7 + size * 0.15;
-      const projectY = (y, z) => canvas.height - padding - (y + 0.3 * z) * size * 0.7 - size * 0.1;
-
-      // Draw triangles
-      ctx.strokeStyle = '#28a745';
-      ctx.lineWidth = 1;
-      for (let i = 0; i < nTris; i++) {
-        const v0 = triangles[i * 3] - 1;
-        const v1 = triangles[i * 3 + 1] - 1;
-        const v2 = triangles[i * 3 + 2] - 1;
-
-        ctx.beginPath();
-        ctx.moveTo(
-          projectX(vertices[v0 * 3], vertices[v0 * 3 + 2]),
-          projectY(vertices[v0 * 3 + 1], vertices[v0 * 3 + 2])
-        );
-        ctx.lineTo(
-          projectX(vertices[v1 * 3], vertices[v1 * 3 + 2]),
-          projectY(vertices[v1 * 3 + 1], vertices[v1 * 3 + 2])
-        );
-        ctx.lineTo(
-          projectX(vertices[v2 * 3], vertices[v2 * 3 + 2]),
-          projectY(vertices[v2 * 3 + 1], vertices[v2 * 3 + 2])
-        );
-        ctx.closePath();
-        ctx.stroke();
-      }
-
-      // Draw vertices
-      ctx.fillStyle = '#dc3545';
-      for (let i = 0; i < nVerts; i++) {
-        ctx.beginPath();
-        ctx.arc(
-          projectX(vertices[i * 3], vertices[i * 3 + 2]),
-          projectY(vertices[i * 3 + 1], vertices[i * 3 + 2]),
-          2, 0, Math.PI * 2
-        );
-        ctx.fill();
-      }
-    }
-
     // ============== Module Loading ==============
     async function initModule() {
       const statusEl = document.getElementById('status');
@@ -370,8 +313,7 @@
         document.getElementById('tri2dBefore').textContent = square.nTriangles;
         document.getElementById('edges2dBefore').textContent = square.nEdges;
 
-        // Draw initial surface mesh and set stats
-        drawMeshSurface(document.getElementById('canvasSBefore'), tetraVertices, tetraTriangles, tetra.nVertices, tetra.nTriangles);
+        // Set initial surface mesh stats
         document.getElementById('verticesSBefore').textContent = tetra.nVertices;
         document.getElementById('triSBefore').textContent = tetra.nTriangles;
         document.getElementById('edgesSBefore').textContent = tetra.nEdges;
@@ -528,39 +470,9 @@
           const newEdges = Module.getValue(sizePtr + 8, 'i32');
           Module._free(sizePtr);
 
-          // Get output vertices
-          const countPtr = Module._malloc(4);
-          const outVerticesPtr = Module._mmgs_get_vertices(handle, countPtr);
-          const vertexCount = Module.getValue(countPtr, 'i32');
-          Module._free(countPtr);
-
-          let outputVertices = null;
-          if (outVerticesPtr && vertexCount > 0) {
-            outputVertices = new Float64Array(vertexCount * 3);
-            outputVertices.set(Module.HEAPF64.subarray(outVerticesPtr / 8, outVerticesPtr / 8 + vertexCount * 3));
-            Module._mmgs_free_array(outVerticesPtr);
-          }
-
-          // Get output triangles
-          const triCountPtr = Module._malloc(4);
-          const outTriPtr = Module._mmgs_get_triangles(handle, triCountPtr);
-          const triCount = Module.getValue(triCountPtr, 'i32');
-          Module._free(triCountPtr);
-
-          let outputTriangles = null;
-          if (outTriPtr && triCount > 0) {
-            outputTriangles = new Int32Array(triCount * 3);
-            outputTriangles.set(Module.HEAP32.subarray(outTriPtr / 4, outTriPtr / 4 + triCount * 3));
-            Module._mmgs_free_array(outTriPtr);
-          }
-
           document.getElementById('verticesSAfter').textContent = newVertices;
           document.getElementById('triSAfter').textContent = newTri;
           document.getElementById('edgesSAfter').textContent = newEdges;
-
-          if (outputVertices && outputTriangles) {
-            drawMeshSurface(document.getElementById('canvasSAfter'), outputVertices, outputTriangles, newVertices, newTri);
-          }
 
           statusEl.textContent = `Surface Remeshing complete (hmax=${hmax})`;
           statusEl.className = 'status success';
