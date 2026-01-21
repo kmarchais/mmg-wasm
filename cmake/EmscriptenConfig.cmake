@@ -62,7 +62,7 @@ set(MMG_WASM_LINK_FLAGS
 
     # Export malloc/free for memory management from JS
     -sEXPORTED_FUNCTIONS=['_malloc','_free']
-    -sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','UTF8ToString','stringToUTF8','getValue','setValue']
+    -sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','UTF8ToString','stringToUTF8','getValue','setValue','HEAP32','HEAPF64','HEAPU8']
 )
 
 # Additional flags for Release builds

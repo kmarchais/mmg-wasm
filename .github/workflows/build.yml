@@ -38,7 +38,12 @@ jobs:
         run: bun run toolchain:check
 
       - name: Build (${{ matrix.build_type }})
-        run: bun run build ${{ matrix.build_type }}
+        run: |
+          if [ "${{ matrix.build_type }}" = "Debug" ]; then
+            bun run build:debug
+          else
+            bun run build
+          fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
