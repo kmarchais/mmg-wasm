@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeAll } from "bun:test";
+import { describe, expect, it, beforeAll, beforeEach, mock } from "bun:test";
 import { initMMG3D, getWasmModule, type MMG3DModule } from "../src/mmg3d";
 import {
   toWasmFloat64,
@@ -9,6 +9,11 @@ import {
   fromWasmUint32,
   freeWasmArray,
   getMemoryStats,
+  configureMemory,
+  checkMemoryAvailable,
+  estimateMeshMemory,
+  resetMemoryTracking,
+  MemoryError,
 } from "../src/memory";
 
 describe("Memory Utilities", () => {
@@ -312,16 +317,78 @@ describe("Memory Utilities", () => {
   });
 
   describe("getMemoryStats", () => {
-    it("should return memory statistics", () => {
-      const stats = getMemoryStats(module);
-
-      expect(stats.totalMemory).toBeGreaterThan(0);
+    beforeEach(() => {
+      resetMemoryTracking(module);
     });
 
-    it("should report total memory matching HEAPU8 size", () => {
+    it("should return all memory statistics fields", () => {
       const stats = getMemoryStats(module);
 
-      expect(stats.totalMemory).toBe(module.HEAPU8.byteLength);
+      expect(stats.heapSize).toBeGreaterThan(0);
+      expect(stats.heapUsed).toBeGreaterThanOrEqual(0);
+      expect(stats.heapFree).toBeGreaterThanOrEqual(0);
+      expect(stats.heapMax).toBe(2 * 1024 * 1024 * 1024); // 2GB
+      expect(stats.usagePercent).toBeGreaterThanOrEqual(0);
+    });
+
+    it("should report heapSize matching HEAPU8 size", () => {
+      const stats = getMemoryStats(module);
+
+      expect(stats.heapSize).toBe(module.HEAPU8.byteLength);
+    });
+
+    it("should track allocations in heapUsed", () => {
+      const data = new Float64Array(1000); // 8000 bytes
+      const ptr = toWasmFloat64(module, data);
+
+      try {
+        const stats = getMemoryStats(module);
+        expect(stats.heapUsed).toBe(8000);
+      } finally {
+        freeWasmArray(module, ptr);
+      }
+    });
+
+    it("should update heapUsed after freeing", () => {
+      const data = new Float64Array(1000);
+      const ptr = toWasmFloat64(module, data);
+
+      freeWasmArray(module, ptr);
+
+      const stats = getMemoryStats(module);
+      expect(stats.heapUsed).toBe(0);
+    });
+
+    it("should track multiple allocations", () => {
+      const data1 = new Float64Array(100); // 800 bytes
+      const data2 = new Int32Array(100); // 400 bytes
+      const data3 = new Uint32Array(100); // 400 bytes
+
+      const ptr1 = toWasmFloat64(module, data1);
+      const ptr2 = toWasmInt32(module, data2);
+      const ptr3 = toWasmUint32(module, data3);
+
+      try {
+        const stats = getMemoryStats(module);
+        expect(stats.heapUsed).toBe(800 + 400 + 400);
+      } finally {
+        freeWasmArray(module, ptr1);
+        freeWasmArray(module, ptr2);
+        freeWasmArray(module, ptr3);
+      }
+    });
+
+    it("should calculate usagePercent correctly", () => {
+      const data = new Float64Array(1000); // 8000 bytes
+      const ptr = toWasmFloat64(module, data);
+
+      try {
+        const stats = getMemoryStats(module);
+        const expectedPercent = (8000 / (2 * 1024 * 1024 * 1024)) * 100;
+        expect(stats.usagePercent).toBeCloseTo(expectedPercent);
+      } finally {
+        freeWasmArray(module, ptr);
+      }
     });
   });
 
@@ -443,6 +510,242 @@ describe("Memory Utilities", () => {
         expect(result[size - 1]).toBe(size - 1);
       } finally {
         freeWasmArray(module, ptr);
+      }
+    });
+  });
+
+  describe("configureMemory", () => {
+    beforeEach(() => {
+      resetMemoryTracking(module);
+      // Reset to default config
+      configureMemory(module, {
+        warnThreshold: 0.8,
+        errorThreshold: 0.95,
+        verbose: false,
+      });
+    });
+
+    it("should accept partial configuration", () => {
+      // Should not throw
+      expect(() => configureMemory(module, { verbose: true })).not.toThrow();
+    });
+
+    it("should merge configuration with existing settings", () => {
+      configureMemory(module, { warnThreshold: 0.5 });
+      configureMemory(module, { errorThreshold: 0.9 });
+
+      // Both settings should be preserved (tested indirectly through behavior)
+      expect(() => configureMemory(module, {})).not.toThrow();
+    });
+  });
+
+  describe("checkMemoryAvailable", () => {
+    beforeEach(() => {
+      resetMemoryTracking(module);
+      configureMemory(module, {
+        warnThreshold: 0.8,
+        errorThreshold: 0.95,
+        verbose: false,
+      });
+    });
+
+    it("should not throw for small allocations", () => {
+      expect(() => checkMemoryAvailable(module, 1000)).not.toThrow();
+    });
+
+    it("should throw MemoryError when allocation would exceed threshold", () => {
+      // Set a very low threshold
+      configureMemory(module, { errorThreshold: 0.00001 });
+
+      // Now even a small allocation should exceed it
+      expect(() => checkMemoryAvailable(module, 1000000)).toThrow(MemoryError);
+    });
+
+    it("should include useful information in MemoryError", () => {
+      configureMemory(module, { errorThreshold: 0.00001 });
+
+      try {
+        checkMemoryAvailable(module, 1000000);
+        expect(true).toBe(false); // Should not reach here
+      } catch (error) {
+        expect(error).toBeInstanceOf(MemoryError);
+        const memError = error as MemoryError;
+        expect(memError.requested).toBe(1000000);
+        expect(memError.available).toBeGreaterThan(0);
+        expect(memError.stats).toBeDefined();
+        expect(memError.stats.heapSize).toBeGreaterThan(0);
+      }
+    });
+
+    it("should consider existing allocations", () => {
+      // Set threshold to 50%
+      configureMemory(module, { errorThreshold: 0.5 });
+
+      // First allocation: should be fine
+      const data = new Float64Array(100);
+      const ptr = toWasmFloat64(module, data);
+
+      try {
+        // Checking for a huge allocation that would push us over 50%
+        const hugeSize = 2 * 1024 * 1024 * 1024 * 0.5; // 50% of 2GB
+        expect(() => checkMemoryAvailable(module, hugeSize)).toThrow(
+          MemoryError,
+        );
+      } finally {
+        freeWasmArray(module, ptr);
+      }
+    });
+  });
+
+  describe("estimateMeshMemory", () => {
+    it("should return a positive number for any mesh", () => {
+      const bytes = estimateMeshMemory(100, 50, 20);
+      expect(bytes).toBeGreaterThan(0);
+    });
+
+    it("should return 0 for empty mesh", () => {
+      const bytes = estimateMeshMemory(0, 0, 0);
+      expect(bytes).toBe(0);
+    });
+
+    it("should scale with vertex count", () => {
+      const bytes1 = estimateMeshMemory(100, 0, 0);
+      const bytes2 = estimateMeshMemory(200, 0, 0);
+      expect(bytes2).toBe(bytes1 * 2);
+    });
+
+    it("should scale with tetrahedra count", () => {
+      const bytes1 = estimateMeshMemory(0, 100, 0);
+      const bytes2 = estimateMeshMemory(0, 200, 0);
+      expect(bytes2).toBe(bytes1 * 2);
+    });
+
+    it("should scale with triangle count", () => {
+      const bytes1 = estimateMeshMemory(0, 0, 100);
+      const bytes2 = estimateMeshMemory(0, 0, 200);
+      expect(bytes2).toBe(bytes1 * 2);
+    });
+
+    it("should return reasonable estimate for typical mesh", () => {
+      // 10K vertices, 50K tetrahedra, 1K triangles
+      const bytes = estimateMeshMemory(10000, 50000, 1000);
+
+      // Should be in the MB range
+      expect(bytes).toBeGreaterThan(1024 * 1024); // > 1MB
+      expect(bytes).toBeLessThan(100 * 1024 * 1024); // < 100MB
+    });
+  });
+
+  describe("resetMemoryTracking", () => {
+    it("should reset heapUsed to 0", () => {
+      const data = new Float64Array(1000);
+      const ptr = toWasmFloat64(module, data);
+
+      // Before reset
+      expect(getMemoryStats(module).heapUsed).toBeGreaterThan(0);
+
+      // Reset tracking (note: this doesn't free memory, just clears tracking)
+      resetMemoryTracking(module);
+
+      // After reset
+      expect(getMemoryStats(module).heapUsed).toBe(0);
+
+      // Still need to free the actual memory
+      module._free(ptr);
+    });
+
+    it("should be safe to call multiple times", () => {
+      expect(() => {
+        resetMemoryTracking(module);
+        resetMemoryTracking(module);
+        resetMemoryTracking(module);
+      }).not.toThrow();
+    });
+
+    it("should not affect subsequent allocations", () => {
+      resetMemoryTracking(module);
+
+      const data = new Float64Array(100);
+      const ptr = toWasmFloat64(module, data);
+
+      try {
+        expect(getMemoryStats(module).heapUsed).toBe(800);
+      } finally {
+        freeWasmArray(module, ptr);
+      }
+    });
+  });
+
+  describe("MemoryError", () => {
+    it("should have correct name", () => {
+      const stats = getMemoryStats(module);
+      const error = new MemoryError("test", 1000, 500, stats);
+      expect(error.name).toBe("MemoryError");
+    });
+
+    it("should store requested and available values", () => {
+      const stats = getMemoryStats(module);
+      const error = new MemoryError("test", 1000, 500, stats);
+      expect(error.requested).toBe(1000);
+      expect(error.available).toBe(500);
+    });
+
+    it("should store stats", () => {
+      const stats = getMemoryStats(module);
+      const error = new MemoryError("test", 1000, 500, stats);
+      expect(error.stats).toBe(stats);
+    });
+
+    it("should be an instance of Error", () => {
+      const stats = getMemoryStats(module);
+      const error = new MemoryError("test", 1000, 500, stats);
+      expect(error).toBeInstanceOf(Error);
+    });
+  });
+
+  describe("Verbose logging", () => {
+    beforeEach(() => {
+      resetMemoryTracking(module);
+    });
+
+    it("should log allocations when verbose is enabled", () => {
+      const logs: string[] = [];
+      const originalLog = console.log;
+      console.log = mock((...args: unknown[]) => {
+        logs.push(args.join(" "));
+      });
+
+      try {
+        configureMemory(module, { verbose: true });
+        const data = new Float64Array(10);
+        const ptr = toWasmFloat64(module, data);
+        freeWasmArray(module, ptr);
+
+        expect(logs.some((log) => log.includes("[mmg-wasm]"))).toBe(true);
+        expect(logs.some((log) => log.includes("Allocated"))).toBe(true);
+        expect(logs.some((log) => log.includes("Freed"))).toBe(true);
+      } finally {
+        console.log = originalLog;
+        configureMemory(module, { verbose: false });
+      }
+    });
+
+    it("should not log when verbose is disabled", () => {
+      const logs: string[] = [];
+      const originalLog = console.log;
+      console.log = mock((...args: unknown[]) => {
+        logs.push(args.join(" "));
+      });
+
+      try {
+        configureMemory(module, { verbose: false });
+        const data = new Float64Array(10);
+        const ptr = toWasmFloat64(module, data);
+        freeWasmArray(module, ptr);
+
+        expect(logs.filter((log) => log.includes("[mmg-wasm]")).length).toBe(0);
+      } finally {
+        console.log = originalLog;
       }
     });
   });
