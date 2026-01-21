@@ -44,7 +44,7 @@ jobs:
       - name: Prepare Pages content
         run: |
           mkdir -p _site
-          cp -r examples/cube-remesh/* _site/
+          cp examples/index.html examples/styles.css _site/
           cp build/dist/mmg.js build/dist/mmg.wasm _site/
 
       - name: Setup Pages

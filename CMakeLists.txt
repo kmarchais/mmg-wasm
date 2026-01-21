@@ -29,7 +29,7 @@ message(STATUS "Emscripten: ${EMSCRIPTEN_VERSION}")
 message(STATUS "")
 
 # Create WASM target linking against mmg
-add_executable(mmg src/stub.c src/mmg3d.c src/mmg2d.c)
+add_executable(mmg src/stub.c src/mmg3d.c src/mmg2d.c src/mmgs.c)
 
 target_link_libraries(mmg PRIVATE libmmg_a)
 
@@ -38,7 +38,7 @@ target_include_directories(mmg PRIVATE
     ${mmg_SOURCE_DIR}/src
 )
 
-# Exported functions for JavaScript bindings (43 total)
+# Exported functions for JavaScript bindings (62 total)
 set(MMG_EXPORTED_FUNCTIONS
     # Existing exports (5)
     '_mmg_version'
@@ -86,6 +86,26 @@ set(MMG_EXPORTED_FUNCTIONS
     '_mmg2d_set_dparameter'
     '_mmg2d_remesh'
     '_mmg2d_free_array'
+    # MMGS wrapper functions (19)
+    '_mmgs_init'
+    '_mmgs_free'
+    '_mmgs_get_available_handles'
+    '_mmgs_get_max_handles'
+    '_mmgs_set_mesh_size'
+    '_mmgs_get_mesh_size'
+    '_mmgs_set_vertex'
+    '_mmgs_set_vertices'
+    '_mmgs_get_vertices'
+    '_mmgs_set_triangle'
+    '_mmgs_set_triangles'
+    '_mmgs_get_triangles'
+    '_mmgs_set_edge'
+    '_mmgs_set_edges'
+    '_mmgs_get_edges'
+    '_mmgs_set_iparameter'
+    '_mmgs_set_dparameter'
+    '_mmgs_remesh'
+    '_mmgs_free_array'
 )
 list(JOIN MMG_EXPORTED_FUNCTIONS "," MMG_EXPORTED_FUNCTIONS_STR)
 
