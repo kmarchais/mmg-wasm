@@ -28,12 +28,18 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "Emscripten: ${EMSCRIPTEN_VERSION}")
 message(STATUS "")
 
-# Placeholder for future binding targets
-# The actual WASM bindings will be added in subsequent issues
-# Example:
-#   add_executable(mmg-wasm src/bindings.c)
-#   target_link_libraries(mmg-wasm PRIVATE libmmg_a)
-#   configure_wasm_target(mmg-wasm)
+# Create WASM target linking against mmg
+add_executable(mmg src/stub.c)
 
-message(STATUS "Configuration complete. mmg library will be built as a static library.")
-message(STATUS "WASM bindings will be added in subsequent development.")
+target_link_libraries(mmg PRIVATE libmmg_a)
+
+target_include_directories(mmg PRIVATE
+    ${mmg_BINARY_DIR}/include
+    ${mmg_SOURCE_DIR}/src
+)
+
+target_link_options(mmg PRIVATE
+    -sEXPORTED_FUNCTIONS=['_mmg_version','_mmgwasm_version','_mmg_test_init','_malloc','_free']
+)
+
+configure_wasm_target(mmg)
