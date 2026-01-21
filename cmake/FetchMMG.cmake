@@ -20,6 +20,10 @@ set(USE_VTK OFF CACHE BOOL "" FORCE)
 set(USE_SCOTCH OFF CACHE BOOL "" FORCE)
 set(USE_ELAS OFF CACHE BOOL "" FORCE)
 
+# Emscripten doesn't have a separate libm - math functions are in libc
+# Set M_LIB to empty to prevent "NOTFOUND" errors
+set(M_LIB "" CACHE STRING "" FORCE)
+
 # Build static library only (no shared library for WASM)
 set(LIBMMG_STATIC ON CACHE BOOL "" FORCE)
 set(LIBMMG_SHARED OFF CACHE BOOL "" FORCE)
