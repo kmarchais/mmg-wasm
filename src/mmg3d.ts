@@ -166,9 +166,11 @@ export async function initMMG3D(): Promise<void> {
   }
 
   // Dynamic import of the Emscripten-generated module
+  // Note: Using build2 temporarily due to permission issues with build/
+  // Once permissions are fixed, rebuild to build/ and update this path
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore - Emscripten module doesn't have TypeScript declarations
-  const createModule = (await import("../build/dist/mmg.js")).default;
+  const createModule = (await import("../build2/dist/mmg.js")).default;
   module = (await createModule()) as MMG3DModule;
 }
 
@@ -180,6 +182,17 @@ function getModule(): MMG3DModule {
     throw new Error("MMG3D not initialized. Call initMMG3D() first.");
   }
   return module;
+}
+
+/**
+ * Get the underlying WASM module for advanced use cases.
+ * Useful for memory utilities that need direct heap access.
+ *
+ * @returns The Emscripten module instance
+ * @throws Error if not initialized
+ */
+export function getWasmModule(): MMG3DModule {
+  return getModule();
 }
 
 /**

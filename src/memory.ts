@@ -3,6 +3,11 @@
  *
  * Standalone utility functions for safely transferring data between
  * JavaScript TypedArrays and the WASM linear memory heap.
+ *
+ * **Important memory management notes:**
+ * - All `toWasm*` functions allocate memory that MUST be freed with `freeWasmArray`
+ * - All `fromWasm*` functions return copies, not views, to prevent invalidation on heap growth
+ * - After freeing a pointer, do not use it again (use-after-free is undefined behavior)
  */
 
 /**
@@ -19,12 +24,13 @@ export interface WasmModule {
 
 /**
  * Memory statistics for the WASM module.
+ *
+ * Note: Emscripten doesn't expose precise heap usage tracking.
+ * Only total allocated buffer size is available.
  */
 export interface MemoryStats {
-  /** Total memory size in bytes */
+  /** Total memory buffer size in bytes (not actual usage) */
   totalMemory: number;
-  /** Memory currently in use (approximation based on heap buffer size) */
-  usedMemory: number;
 }
 
 /**
@@ -54,7 +60,7 @@ export function toWasmFloat64(module: WasmModule, data: Float64Array): number {
   const ptr = module._malloc(data.byteLength);
   if (ptr === 0) {
     throw new Error(
-      `Failed to allocate ${data.byteLength} bytes for Float64Array`,
+      `Failed to allocate ${data.byteLength} bytes (${data.length} Float64 elements)`,
     );
   }
 
@@ -90,12 +96,49 @@ export function toWasmInt32(module: WasmModule, data: Int32Array): number {
   const ptr = module._malloc(data.byteLength);
   if (ptr === 0) {
     throw new Error(
-      `Failed to allocate ${data.byteLength} bytes for Int32Array`,
+      `Failed to allocate ${data.byteLength} bytes (${data.length} Int32 elements)`,
     );
   }
 
   // Copy data to WASM heap
   module.HEAP32.set(data, ptr / 4);
+  return ptr;
+}
+
+/**
+ * Copy a Uint32Array to the WASM heap.
+ *
+ * @param module - The WASM module instance
+ * @param data - The Uint32Array to copy
+ * @returns Pointer to the allocated memory (0 for empty arrays)
+ * @throws Error if memory allocation fails
+ *
+ * @example
+ * ```ts
+ * const indices = new Uint32Array([1, 2, 3, 4]);
+ * const ptr = toWasmUint32(module, indices);
+ * try {
+ *   // Use ptr with WASM functions
+ * } finally {
+ *   freeWasmArray(module, ptr);
+ * }
+ * ```
+ */
+export function toWasmUint32(module: WasmModule, data: Uint32Array): number {
+  if (data.length === 0) {
+    return 0;
+  }
+
+  const ptr = module._malloc(data.byteLength);
+  if (ptr === 0) {
+    throw new Error(
+      `Failed to allocate ${data.byteLength} bytes (${data.length} Uint32 elements)`,
+    );
+  }
+
+  // Copy data to WASM heap using a Uint32Array view on the heap buffer
+  const heapU32 = new Uint32Array(module.HEAPU8.buffer, ptr, data.length);
+  heapU32.set(data);
   return ptr;
 }
 
@@ -158,9 +201,48 @@ export function fromWasmInt32(
 }
 
 /**
+ * Copy Uint32 data from the WASM heap to a new Uint32Array.
+ *
+ * @param module - The WASM module instance
+ * @param ptr - Pointer to the data in WASM heap
+ * @param length - Number of Uint32 elements to copy
+ * @returns New Uint32Array containing the copied data
+ *
+ * @example
+ * ```ts
+ * // After a WASM function returns a pointer to uint32 data
+ * const indices = fromWasmUint32(module, dataPtr, numElements);
+ * ```
+ */
+export function fromWasmUint32(
+  module: WasmModule,
+  ptr: number,
+  length: number,
+): Uint32Array {
+  if (length === 0 || ptr === 0) {
+    return new Uint32Array(0);
+  }
+
+  // Create a copy of the data (not a view) to prevent invalidation on heap growth
+  const heapU32 = new Uint32Array(module.HEAPU8.buffer, ptr, length);
+  const result = new Uint32Array(length);
+  result.set(heapU32);
+  return result;
+}
+
+/**
  * Free memory allocated on the WASM heap.
  *
  * This function is idempotent: freeing a null pointer (0) is a no-op.
+ *
+ * **Warning:** After calling this function, the pointer is invalid.
+ * Using a freed pointer (use-after-free) causes undefined behavior.
+ * Consider setting the pointer variable to 0 after freeing:
+ *
+ * ```ts
+ * freeWasmArray(module, ptr);
+ * ptr = 0; // Prevent accidental reuse
+ * ```
  *
  * @param module - The WASM module instance
  * @param ptr - Pointer to free (0 is allowed and ignored)
@@ -184,20 +266,21 @@ export function freeWasmArray(module: WasmModule, ptr: number): void {
 /**
  * Get memory statistics for the WASM module.
  *
+ * Note: Emscripten doesn't expose precise heap usage, so only the total
+ * memory buffer size is available. This represents the allocated buffer
+ * size, not actual memory in use.
+ *
  * @param module - The WASM module instance
  * @returns Memory statistics
  *
  * @example
  * ```ts
  * const stats = getMemoryStats(module);
- * console.log(`Total: ${stats.totalMemory}, Used: ${stats.usedMemory}`);
+ * console.log(`Total buffer: ${stats.totalMemory} bytes`);
  * ```
  */
 export function getMemoryStats(module: WasmModule): MemoryStats {
-  const totalMemory = module.HEAPU8.byteLength;
   return {
-    totalMemory,
-    // Note: Emscripten doesn't expose precise heap usage, so we report total as an approximation
-    usedMemory: totalMemory,
+    totalMemory: module.HEAPU8.byteLength,
   };
 }

@@ -4,6 +4,7 @@
 // Export MMG3D bindings
 export {
   initMMG3D,
+  getWasmModule,
   MMG3D,
   IPARAM,
   DPARAM,
@@ -18,8 +19,10 @@ export {
 export {
   toWasmFloat64,
   toWasmInt32,
+  toWasmUint32,
   fromWasmFloat64,
   fromWasmInt32,
+  fromWasmUint32,
   freeWasmArray,
   getMemoryStats,
   type WasmModule,

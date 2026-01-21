@@ -51,13 +51,11 @@ describe("MMG3D", () => {
 			expect(() => MMG3D.free(handle)).toThrow();
 		});
 
-		// TODO: These tests require a rebuild with the latest C wrapper functions
-		// The functions exist in src/mmg3d.c but aren't in the current WASM build
-		it.skip("should report max handles as 64", () => {
+		it("should report max handles as 64", () => {
 			expect(MMG3D.getMaxHandles()).toBe(64);
 		});
 
-		it.skip("should track available handles correctly", () => {
+		it("should track available handles correctly", () => {
 			const initialAvailable = MMG3D.getAvailableHandles();
 			const handle = MMG3D.init();
 			handles.push(handle);
