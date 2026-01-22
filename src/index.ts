@@ -115,6 +115,15 @@ export {
   type MemoryConfig,
 } from "./memory";
 
+// Export Three.js integration utilities
+export {
+  fromThreeGeometry,
+  toThreeGeometry,
+  toThreeGeometrySync,
+  type FromThreeOptions,
+  type ToThreeOptions,
+} from "./three";
+
 // Legacy interface (for backwards compatibility)
 export interface MmgModule {
   mmg_version(): string;
