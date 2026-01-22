@@ -75,6 +75,9 @@ export default function App() {
   const { isLoaded, remesh, loadMeshFile, saveMeshFile, computeQuality } = useMmgWasm();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Ref to hold the latest handleRemesh without causing re-runs
+  const handleRemeshRef = useRef<() => Promise<void>>(() => Promise.resolve());
+
   // Apply theme to document synchronously before paint
   useLayoutEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -100,13 +103,12 @@ export default function App() {
         const scale3d = getMeshScale(cubeMesh, false);
         setMeshBefore("mmg3d", { ...cubeMesh, quality: quality3d }, cubeStats, scale3d);
 
-        // Initial remesh
-        handleRemesh();
+        // Initial remesh - use ref to avoid stale closure
+        handleRemeshRef.current();
       };
       initMeshes();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoaded]);
+  }, [isLoaded, computeQuality, setMeshBefore]);
 
   // Live remesh when parameters change
   useEffect(() => {
@@ -117,7 +119,8 @@ export default function App() {
     }
 
     debounceRef.current = setTimeout(() => {
-      handleRemesh();
+      // Use ref to get latest handleRemesh without dependency
+      handleRemeshRef.current();
     }, 100);
 
     return () => {
@@ -125,7 +128,6 @@ export default function App() {
         clearTimeout(debounceRef.current);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params, liveRemesh, isLoaded, activeMeshType]);
 
   const handleRemesh = useCallback(async () => {
@@ -163,6 +165,11 @@ export default function App() {
     setStatusMessage,
     setShowOriginalMesh,
   ]);
+
+  // Keep handleRemeshRef updated with the latest handleRemesh
+  useEffect(() => {
+    handleRemeshRef.current = handleRemesh;
+  }, [handleRemesh]);
 
   const handleFileLoad = useCallback(
     async (file: File) => {

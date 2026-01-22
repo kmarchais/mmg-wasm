@@ -1,6 +1,9 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useMeshStore } from "@/stores/meshStore";
 import type { MeshType, MeshData, MeshStats, RemeshParams } from "@/types/mesh";
+import { DPARAM_2D, IPARAM_2D } from "../../../src/mmg2d";
+import { DPARAM_S, IPARAM_S } from "../../../src/mmgs";
+import { DPARAM, IPARAM } from "../../../src/mmg3d";
 
 interface MmgModule {
   _malloc: (size: number) => number;
@@ -158,11 +161,6 @@ interface MmgModule {
   stringToUTF8: (str: string, ptr: number, maxBytes: number) => void;
 }
 
-// Parameter indices
-const IPARAM_VERBOSE = 0;
-const DPARAM_2D = { hmin: 23, hmax: 24, hsiz: 25, hausd: 26, hgrad: 27 };
-const DPARAM_S = { hmin: 22, hmax: 23, hsiz: 24, hausd: 25, hgrad: 26 };
-const DPARAM_3D = { hmin: 27, hmax: 28, hsiz: 29, hausd: 30, hgrad: 31 };
 
 let modulePromise: Promise<MmgModule> | null = null;
 let moduleInstance: MmgModule | null = null;
@@ -377,7 +375,7 @@ async function remesh2D(
     }
 
     // Set parameters
-    Module._mmg2d_set_iparameter(handle, IPARAM_VERBOSE, -1);
+    Module._mmg2d_set_iparameter(handle, IPARAM_2D.verbose, -1);
     if (params.hmin !== undefined)
       Module._mmg2d_set_dparameter(handle, DPARAM_2D.hmin, params.hmin);
     if (params.hmax !== undefined)
@@ -523,7 +521,7 @@ async function remeshS(
     }
 
     // Set parameters
-    Module._mmgs_set_iparameter(handle, IPARAM_VERBOSE, -1);
+    Module._mmgs_set_iparameter(handle, IPARAM_S.verbose, -1);
     if (params.hmin !== undefined)
       Module._mmgs_set_dparameter(handle, DPARAM_S.hmin, params.hmin);
     if (params.hmax !== undefined)
@@ -671,17 +669,17 @@ async function remesh3D(
     }
 
     // Set parameters
-    Module._mmg3d_set_iparameter(handle, IPARAM_VERBOSE, -1);
+    Module._mmg3d_set_iparameter(handle, IPARAM.verbose, -1);
     if (params.hmin !== undefined)
-      Module._mmg3d_set_dparameter(handle, DPARAM_3D.hmin, params.hmin);
+      Module._mmg3d_set_dparameter(handle, DPARAM.hmin, params.hmin);
     if (params.hmax !== undefined)
-      Module._mmg3d_set_dparameter(handle, DPARAM_3D.hmax, params.hmax);
+      Module._mmg3d_set_dparameter(handle, DPARAM.hmax, params.hmax);
     if (params.hsiz !== undefined)
-      Module._mmg3d_set_dparameter(handle, DPARAM_3D.hsiz, params.hsiz);
+      Module._mmg3d_set_dparameter(handle, DPARAM.hsiz, params.hsiz);
     if (params.hausd !== undefined)
-      Module._mmg3d_set_dparameter(handle, DPARAM_3D.hausd, params.hausd);
+      Module._mmg3d_set_dparameter(handle, DPARAM.hausd, params.hausd);
     if (params.hgrad !== undefined)
-      Module._mmg3d_set_dparameter(handle, DPARAM_3D.hgrad, params.hgrad);
+      Module._mmg3d_set_dparameter(handle, DPARAM.hgrad, params.hgrad);
 
     // Remesh
     result = Module._mmg3d_remesh(handle);

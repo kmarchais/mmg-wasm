@@ -17,7 +17,15 @@ export function ColorBar({ min, max }: ColorBarProps) {
 
   return (
     <div className="p-2 bg-white dark:bg-gray-900 rounded-lg shadow-sm">
-      <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{label}</p>
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-xs font-medium text-gray-600 dark:text-gray-400">{label}</p>
+        <span
+          className="text-xs text-gray-400 dark:text-gray-500 cursor-help"
+          title="Quality metric: 0 = degenerate/worst, 1 = best attainable. Values closer to 1 indicate better element quality."
+        >
+          0 (worst) → 1 (best)
+        </span>
+      </div>
       <div
         className="h-4 w-full rounded"
         style={{ background: gradient }}
