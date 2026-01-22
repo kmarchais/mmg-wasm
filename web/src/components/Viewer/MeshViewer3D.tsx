@@ -1,24 +1,40 @@
-import { useMemo, useRef } from "react";
-import { Canvas } from "@react-three/fiber";
-import { TrackballControls, GizmoHelper, GizmoViewport, Environment } from "@react-three/drei";
-import * as THREE from "three";
+import { CanvasErrorBoundary } from "@/components/ErrorBoundary";
 import { useMeshStore } from "@/stores/meshStore";
 import type { MeshData } from "@/types/mesh";
 import { getColorArray } from "@/utils/colorMapping";
 import {
-  createCenteredPositions,
   buildClippedTetrahedraGeometry,
   buildSurfaceGeometry,
   computeBoundingBox,
+  createCenteredPositions,
 } from "@/utils/geometryBuilder";
-import { CanvasErrorBoundary } from "@/components/ErrorBoundary";
+import {
+  Environment,
+  GizmoHelper,
+  GizmoViewport,
+  TrackballControls,
+} from "@react-three/drei";
+import { Canvas } from "@react-three/fiber";
+import { useMemo, useRef } from "react";
+import * as THREE from "three";
 
 interface MeshViewer3DProps {
   mesh: MeshData | null;
 }
 
-function MeshGeometry({ mesh, boundingBox }: { mesh: MeshData; boundingBox: { min: THREE.Vector3; max: THREE.Vector3; center: THREE.Vector3 } }) {
-  const { viewerOptions, theme, clippingEnabled, clippingPosition } = useMeshStore();
+function MeshGeometry({
+  mesh,
+  boundingBox,
+}: {
+  mesh: MeshData;
+  boundingBox: {
+    min: THREE.Vector3;
+    max: THREE.Vector3;
+    center: THREE.Vector3;
+  };
+}) {
+  const { viewerOptions, theme, clippingEnabled, clippingPosition } =
+    useMeshStore();
   const meshRef = useRef<THREE.Mesh>(null);
   const wireframeRef = useRef<THREE.LineSegments>(null);
   const pointsRef = useRef<THREE.Points>(null);
@@ -38,27 +54,39 @@ function MeshGeometry({ mesh, boundingBox }: { mesh: MeshData; boundingBox: { mi
     return extendedMin + extendedSize * clippingPosition;
   }, [clippingEnabled, clippingPosition, boundingBox]);
 
-  const { geometry, wireframeGeometry, pointsGeometry, tetFaceColors } = useMemo(() => {
-    const nVerts = mesh.vertices.length / 3;
-    const nTris = mesh.triangles ? mesh.triangles.length / 3 : 0;
+  const { geometry, wireframeGeometry, pointsGeometry, tetFaceColors } =
+    useMemo(() => {
+      const nVerts = mesh.vertices.length / 3;
+      const nTris = mesh.triangles ? mesh.triangles.length / 3 : 0;
 
-    // Create centered positions array
-    const positions = createCenteredPositions(mesh.vertices, nVerts, boundingBox.center);
-
-    // Build geometry based on clipping mode
-    if (showTetrahedraFaces && mesh.tetrahedra && clipThreshold !== null) {
-      return buildClippedTetrahedraGeometry(
-        mesh,
-        positions,
-        clipThreshold,
-        viewerOptions.qualityMetric,
-        viewerOptions.colormap
+      // Create centered positions array
+      const positions = createCenteredPositions(
+        mesh.vertices,
+        nVerts,
+        boundingBox.center,
       );
-    }
 
-    // Default: use surface triangles
-    return buildSurfaceGeometry(mesh, positions, nTris);
-  }, [mesh, boundingBox, showTetrahedraFaces, clipThreshold, viewerOptions.qualityMetric, viewerOptions.colormap]);
+      // Build geometry based on clipping mode
+      if (showTetrahedraFaces && mesh.tetrahedra && clipThreshold !== null) {
+        return buildClippedTetrahedraGeometry(
+          mesh,
+          positions,
+          clipThreshold,
+          viewerOptions.qualityMetric,
+          viewerOptions.colormap,
+        );
+      }
+
+      // Default: use surface triangles
+      return buildSurfaceGeometry(mesh, positions, nTris);
+    }, [
+      mesh,
+      boundingBox,
+      showTetrahedraFaces,
+      clipThreshold,
+      viewerOptions.qualityMetric,
+      viewerOptions.colormap,
+    ]);
 
   // Compute quality colors for surface triangles
   // For MMGS meshes, use stored triangle quality
@@ -90,7 +118,12 @@ function MeshGeometry({ mesh, boundingBox }: { mesh: MeshData; boundingBox: { mi
     }
 
     return vertexColors;
-  }, [mesh, viewerOptions.qualityMetric, viewerOptions.colormap, showTetrahedraFaces]);
+  }, [
+    mesh,
+    viewerOptions.qualityMetric,
+    viewerOptions.colormap,
+    showTetrahedraFaces,
+  ]);
 
   // Set colors on geometry for surface triangles (MMGS/MMG2D with quality)
   useMemo(() => {
@@ -115,7 +148,11 @@ function MeshGeometry({ mesh, boundingBox }: { mesh: MeshData; boundingBox: { mi
   return (
     <group>
       {viewerOptions.showFaces && (
-        <mesh ref={meshRef} geometry={geometry} key={`mesh-${showTetrahedraFaces}-${hasColors}`}>
+        <mesh
+          ref={meshRef}
+          geometry={geometry}
+          key={`mesh-${showTetrahedraFaces}-${hasColors}`}
+        >
           <meshStandardMaterial
             color={hasColors ? "#ffffff" : faceColor}
             vertexColors={hasColors}
@@ -157,7 +194,11 @@ export function MeshViewer3D({ mesh }: MeshViewer3DProps) {
           <Canvas
             camera={{ position: [2, 2, 2], fov: 50 }}
             style={{ background: backgroundColor }}
-            gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
+            gl={{
+              antialias: true,
+              toneMapping: THREE.ACESFilmicToneMapping,
+              toneMappingExposure: 1.0,
+            }}
           >
             <Environment preset="studio" background={false} />
             <ambientLight intensity={1.2} />

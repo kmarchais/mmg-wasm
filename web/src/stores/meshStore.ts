@@ -1,15 +1,15 @@
-import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import type {
-  MeshType,
+  ColormapName,
+  LoadingStatus,
   MeshData,
   MeshStats,
+  MeshType,
   RemeshParams,
-  ViewerOptions,
-  LoadingStatus,
   StatusMessage,
-  ColormapName,
+  ViewerOptions,
 } from "@/types/mesh";
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 export type Theme = "light" | "dark";
 
@@ -58,7 +58,12 @@ interface MeshState {
       scale: number;
     }
   >;
-  setMeshBefore: (type: MeshType, data: MeshData, stats: MeshStats, scale?: number) => void;
+  setMeshBefore: (
+    type: MeshType,
+    data: MeshData,
+    stats: MeshStats,
+    scale?: number,
+  ) => void;
   setMeshAfter: (type: MeshType, data: MeshData, stats: MeshStats) => void;
   clearMeshAfter: (type: MeshType) => void;
 
@@ -70,7 +75,7 @@ interface MeshState {
   viewerOptions: ViewerOptions;
   setViewerOption: <K extends keyof ViewerOptions>(
     key: K,
-    value: ViewerOptions[K]
+    value: ViewerOptions[K],
   ) => void;
 }
 
@@ -202,6 +207,6 @@ export const useMeshStore = create<MeshState>()(
         viewerOptions: state.viewerOptions,
         liveRemesh: state.liveRemesh,
       }),
-    }
-  )
+    },
+  ),
 );

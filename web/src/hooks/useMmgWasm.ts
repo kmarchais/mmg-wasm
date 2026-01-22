@@ -1,11 +1,10 @@
-import { useEffect, useRef, useCallback, useState } from "react";
 import { useMeshStore } from "@/stores/meshStore";
-import type { MeshType, MeshData, MeshStats, RemeshParams } from "@/types/mesh";
+import type { MeshData, MeshStats, MeshType, RemeshParams } from "@/types/mesh";
 import type { MmgModule } from "@/types/wasmModule";
 import { DPARAM_2D, IPARAM_2D } from "@mmg-wasm/mmg2d";
-import { DPARAM_S, IPARAM_S } from "@mmg-wasm/mmgs";
 import { DPARAM, IPARAM } from "@mmg-wasm/mmg3d";
-
+import { DPARAM_S, IPARAM_S } from "@mmg-wasm/mmgs";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 let modulePromise: Promise<MmgModule> | null = null;
 let moduleInstance: MmgModule | null = null;
@@ -15,7 +14,8 @@ async function loadModule(): Promise<MmgModule> {
   if (modulePromise) return modulePromise;
 
   modulePromise = (async () => {
-    const createModule = (await import("../../mmg.js")).default as () => Promise<MmgModule>;
+    const createModule = (await import("../../mmg.js"))
+      .default as () => Promise<MmgModule>;
     moduleInstance = await createModule();
     return moduleInstance;
   })();
@@ -62,7 +62,7 @@ export function useMmgWasm() {
     async (
       meshType: MeshType,
       inputMesh: MeshData,
-      params: RemeshParams
+      params: RemeshParams,
     ): Promise<{ mesh: MeshData; stats: MeshStats }> => {
       const Module = moduleRef.current;
       if (!Module) throw new Error("WASM module not loaded");
@@ -75,13 +75,13 @@ export function useMmgWasm() {
         return remesh3D(Module, inputMesh, params);
       }
     },
-    []
+    [],
   );
 
   const loadMeshFile = useCallback(
     async (
       meshType: MeshType,
-      file: File
+      file: File,
     ): Promise<{ mesh: MeshData; stats: MeshStats }> => {
       const Module = moduleRef.current;
       if (!Module) throw new Error("WASM module not loaded");
@@ -107,11 +107,15 @@ export function useMmgWasm() {
         }
       }
     },
-    []
+    [],
   );
 
   const saveMeshFile = useCallback(
-    async (meshType: MeshType, mesh: MeshData, filename: string): Promise<Uint8Array> => {
+    async (
+      meshType: MeshType,
+      mesh: MeshData,
+      filename: string,
+    ): Promise<Uint8Array> => {
       const Module = moduleRef.current;
       if (!Module) throw new Error("WASM module not loaded");
 
@@ -129,14 +133,11 @@ export function useMmgWasm() {
       Module.FS.unlink(filepath);
       return content;
     },
-    []
+    [],
   );
 
   const computeQuality = useCallback(
-    async (
-      meshType: MeshType,
-      mesh: MeshData
-    ): Promise<Float64Array> => {
+    async (meshType: MeshType, mesh: MeshData): Promise<Float64Array> => {
       const Module = moduleRef.current;
       if (!Module) throw new Error("WASM module not loaded");
 
@@ -148,7 +149,7 @@ export function useMmgWasm() {
         return computeQuality3D(Module, mesh);
       }
     },
-    []
+    [],
   );
 
   return { isLoaded, remesh, loadMeshFile, saveMeshFile, computeQuality };
@@ -178,7 +179,7 @@ function allocString(Module: MmgModule, str: string): number {
 async function remesh2D(
   Module: MmgModule,
   input: MeshData,
-  params: RemeshParams
+  params: RemeshParams,
 ): Promise<{ mesh: MeshData; stats: MeshStats }> {
   const nVertices = input.vertices.length / 2;
   const nTriangles = input.triangles ? input.triangles.length / 3 : 0;
@@ -193,7 +194,7 @@ async function remesh2D(
       nVertices,
       nTriangles,
       0,
-      nEdges
+      nEdges,
     );
     if (result !== 1) throw new Error("Failed to set mesh size");
 
@@ -243,7 +244,7 @@ async function remesh2D(
       sizePtr,
       sizePtr + 4,
       sizePtr + 8,
-      sizePtr + 12
+      sizePtr + 12,
     );
     const outNv = Module.getValue(sizePtr, "i32");
     const outNt = Module.getValue(sizePtr + 4, "i32");
@@ -259,7 +260,7 @@ async function remesh2D(
     const outVertices = new Float64Array(vertCount * 2);
     if (outVertPtr && vertCount > 0) {
       outVertices.set(
-        Module.HEAPF64.subarray(outVertPtr / 8, outVertPtr / 8 + vertCount * 2)
+        Module.HEAPF64.subarray(outVertPtr / 8, outVertPtr / 8 + vertCount * 2),
       );
       Module._mmg2d_free_array(outVertPtr);
     }
@@ -273,7 +274,7 @@ async function remesh2D(
     const outTriangles = new Int32Array(triCount * 3);
     if (outTriPtr && triCount > 0) {
       outTriangles.set(
-        Module.HEAP32.subarray(outTriPtr / 4, outTriPtr / 4 + triCount * 3)
+        Module.HEAP32.subarray(outTriPtr / 4, outTriPtr / 4 + triCount * 3),
       );
       Module._mmg2d_free_array(outTriPtr);
     }
@@ -287,7 +288,7 @@ async function remesh2D(
     const outEdges = new Int32Array(edgeCount * 2);
     if (outEdgePtr && edgeCount > 0) {
       outEdges.set(
-        Module.HEAP32.subarray(outEdgePtr / 4, outEdgePtr / 4 + edgeCount * 2)
+        Module.HEAP32.subarray(outEdgePtr / 4, outEdgePtr / 4 + edgeCount * 2),
       );
       Module._mmg2d_free_array(outEdgePtr);
     }
@@ -296,13 +297,18 @@ async function remesh2D(
     let outQuality = new Float64Array(0);
     if (triCount > 0) {
       const qualCountPtr = Module._malloc(4);
-      const qualPtr = Module._mmg2d_get_triangles_qualities(handle, qualCountPtr);
+      const qualPtr = Module._mmg2d_get_triangles_qualities(
+        handle,
+        qualCountPtr,
+      );
       const qualCount = Module.getValue(qualCountPtr, "i32");
       Module._free(qualCountPtr);
 
       if (qualPtr && qualCount > 0) {
         outQuality = new Float64Array(qualCount);
-        outQuality.set(Module.HEAPF64.subarray(qualPtr / 8, qualPtr / 8 + qualCount));
+        outQuality.set(
+          Module.HEAPF64.subarray(qualPtr / 8, qualPtr / 8 + qualCount),
+        );
         Module._mmg2d_free_array(qualPtr);
       }
     }
@@ -330,7 +336,7 @@ async function remesh2D(
 async function remeshS(
   Module: MmgModule,
   input: MeshData,
-  params: RemeshParams
+  params: RemeshParams,
 ): Promise<{ mesh: MeshData; stats: MeshStats }> {
   const nVertices = input.vertices.length / 3;
   const nTriangles = input.triangles ? input.triangles.length / 3 : 0;
@@ -340,7 +346,12 @@ async function remeshS(
   if (handle < 0) throw new Error("Failed to initialize MMGS");
 
   try {
-    let result = Module._mmgs_set_mesh_size(handle, nVertices, nTriangles, nEdges);
+    let result = Module._mmgs_set_mesh_size(
+      handle,
+      nVertices,
+      nTriangles,
+      nEdges,
+    );
     if (result !== 1) throw new Error("Failed to set mesh size");
 
     // Set vertices
@@ -399,7 +410,7 @@ async function remeshS(
     const outVertices = new Float64Array(vertCount * 3);
     if (outVertPtr && vertCount > 0) {
       outVertices.set(
-        Module.HEAPF64.subarray(outVertPtr / 8, outVertPtr / 8 + vertCount * 3)
+        Module.HEAPF64.subarray(outVertPtr / 8, outVertPtr / 8 + vertCount * 3),
       );
       Module._mmgs_free_array(outVertPtr);
     }
@@ -413,7 +424,7 @@ async function remeshS(
     const outTriangles = new Int32Array(triCount * 3);
     if (outTriPtr && triCount > 0) {
       outTriangles.set(
-        Module.HEAP32.subarray(outTriPtr / 4, outTriPtr / 4 + triCount * 3)
+        Module.HEAP32.subarray(outTriPtr / 4, outTriPtr / 4 + triCount * 3),
       );
       Module._mmgs_free_array(outTriPtr);
     }
@@ -427,7 +438,7 @@ async function remeshS(
     const outEdges = new Int32Array(edgeCount * 2);
     if (outEdgePtr && edgeCount > 0) {
       outEdges.set(
-        Module.HEAP32.subarray(outEdgePtr / 4, outEdgePtr / 4 + edgeCount * 2)
+        Module.HEAP32.subarray(outEdgePtr / 4, outEdgePtr / 4 + edgeCount * 2),
       );
       Module._mmgs_free_array(outEdgePtr);
     }
@@ -436,13 +447,18 @@ async function remeshS(
     let outQuality = new Float64Array(0);
     if (triCount > 0) {
       const qualCountPtr = Module._malloc(4);
-      const qualPtr = Module._mmgs_get_triangles_qualities(handle, qualCountPtr);
+      const qualPtr = Module._mmgs_get_triangles_qualities(
+        handle,
+        qualCountPtr,
+      );
       const qualCount = Module.getValue(qualCountPtr, "i32");
       Module._free(qualCountPtr);
 
       if (qualPtr && qualCount > 0) {
         outQuality = new Float64Array(qualCount);
-        outQuality.set(Module.HEAPF64.subarray(qualPtr / 8, qualPtr / 8 + qualCount));
+        outQuality.set(
+          Module.HEAPF64.subarray(qualPtr / 8, qualPtr / 8 + qualCount),
+        );
         Module._mmgs_free_array(qualPtr);
       }
     }
@@ -470,7 +486,7 @@ async function remeshS(
 async function remesh3D(
   Module: MmgModule,
   input: MeshData,
-  params: RemeshParams
+  params: RemeshParams,
 ): Promise<{ mesh: MeshData; stats: MeshStats }> {
   const nVertices = input.vertices.length / 3;
   const nTetrahedra = input.tetrahedra ? input.tetrahedra.length / 4 : 0;
@@ -487,7 +503,7 @@ async function remesh3D(
       0,
       nTriangles,
       0,
-      0
+      0,
     );
     if (result !== 1) throw new Error("Failed to set mesh size");
 
@@ -539,7 +555,7 @@ async function remesh3D(
       sizePtr + 8,
       sizePtr + 12,
       sizePtr + 16,
-      sizePtr + 20
+      sizePtr + 20,
     );
     const outNv = Module.getValue(sizePtr, "i32");
     const outNe = Module.getValue(sizePtr + 4, "i32");
@@ -555,7 +571,7 @@ async function remesh3D(
     const outVertices = new Float64Array(vertCount * 3);
     if (outVertPtr && vertCount > 0) {
       outVertices.set(
-        Module.HEAPF64.subarray(outVertPtr / 8, outVertPtr / 8 + vertCount * 3)
+        Module.HEAPF64.subarray(outVertPtr / 8, outVertPtr / 8 + vertCount * 3),
       );
       Module._mmg3d_free_array(outVertPtr);
     }
@@ -569,7 +585,10 @@ async function remesh3D(
     const outTetrahedra = new Int32Array(tetraCount * 4);
     if (outTetraPtr && tetraCount > 0) {
       outTetrahedra.set(
-        Module.HEAP32.subarray(outTetraPtr / 4, outTetraPtr / 4 + tetraCount * 4)
+        Module.HEAP32.subarray(
+          outTetraPtr / 4,
+          outTetraPtr / 4 + tetraCount * 4,
+        ),
       );
       Module._mmg3d_free_array(outTetraPtr);
     }
@@ -583,7 +602,7 @@ async function remesh3D(
     const outTriangles = new Int32Array(triCount * 3);
     if (outTriPtr && triCount > 0) {
       outTriangles.set(
-        Module.HEAP32.subarray(outTriPtr / 4, outTriPtr / 4 + triCount * 3)
+        Module.HEAP32.subarray(outTriPtr / 4, outTriPtr / 4 + triCount * 3),
       );
       Module._mmg3d_free_array(outTriPtr);
     }
@@ -592,13 +611,18 @@ async function remesh3D(
     let outQuality = new Float64Array(0);
     if (tetraCount > 0) {
       const qualCountPtr = Module._malloc(4);
-      const qualPtr = Module._mmg3d_get_tetrahedra_qualities(handle, qualCountPtr);
+      const qualPtr = Module._mmg3d_get_tetrahedra_qualities(
+        handle,
+        qualCountPtr,
+      );
       const qualCount = Module.getValue(qualCountPtr, "i32");
       Module._free(qualCountPtr);
 
       if (qualPtr && qualCount > 0) {
         outQuality = new Float64Array(qualCount);
-        outQuality.set(Module.HEAPF64.subarray(qualPtr / 8, qualPtr / 8 + qualCount));
+        outQuality.set(
+          Module.HEAPF64.subarray(qualPtr / 8, qualPtr / 8 + qualCount),
+        );
         Module._mmg3d_free_array(qualPtr);
       }
     }
@@ -625,7 +649,7 @@ async function remesh3D(
 // File loading functions
 async function loadMesh2D(
   Module: MmgModule,
-  filename: string
+  filename: string,
 ): Promise<{ mesh: MeshData; stats: MeshStats }> {
   const handle = Module._mmg2d_init();
   if (handle < 0) throw new Error("Failed to initialize MMG2D");
@@ -643,7 +667,7 @@ async function loadMesh2D(
       sizePtr,
       sizePtr + 4,
       sizePtr + 8,
-      sizePtr + 12
+      sizePtr + 12,
     );
     const nv = Module.getValue(sizePtr, "i32");
     const nt = Module.getValue(sizePtr + 4, "i32");
@@ -659,7 +683,7 @@ async function loadMesh2D(
     const vertices = new Float64Array(vertCount * 2);
     if (vertPtr && vertCount > 0) {
       vertices.set(
-        Module.HEAPF64.subarray(vertPtr / 8, vertPtr / 8 + vertCount * 2)
+        Module.HEAPF64.subarray(vertPtr / 8, vertPtr / 8 + vertCount * 2),
       );
       Module._mmg2d_free_array(vertPtr);
     }
@@ -673,7 +697,7 @@ async function loadMesh2D(
     const triangles = new Int32Array(triCount * 3);
     if (triPtr && triCount > 0) {
       triangles.set(
-        Module.HEAP32.subarray(triPtr / 4, triPtr / 4 + triCount * 3)
+        Module.HEAP32.subarray(triPtr / 4, triPtr / 4 + triCount * 3),
       );
       Module._mmg2d_free_array(triPtr);
     }
@@ -687,7 +711,7 @@ async function loadMesh2D(
     const edges = new Int32Array(edgeCount * 2);
     if (edgePtr && edgeCount > 0) {
       edges.set(
-        Module.HEAP32.subarray(edgePtr / 4, edgePtr / 4 + edgeCount * 2)
+        Module.HEAP32.subarray(edgePtr / 4, edgePtr / 4 + edgeCount * 2),
       );
       Module._mmg2d_free_array(edgePtr);
     }
@@ -696,13 +720,18 @@ async function loadMesh2D(
     let quality = new Float64Array(0);
     if (triCount > 0) {
       const qualCountPtr = Module._malloc(4);
-      const qualPtr = Module._mmg2d_get_triangles_qualities(handle, qualCountPtr);
+      const qualPtr = Module._mmg2d_get_triangles_qualities(
+        handle,
+        qualCountPtr,
+      );
       const qualCount = Module.getValue(qualCountPtr, "i32");
       Module._free(qualCountPtr);
 
       if (qualPtr && qualCount > 0) {
         quality = new Float64Array(qualCount);
-        quality.set(Module.HEAPF64.subarray(qualPtr / 8, qualPtr / 8 + qualCount));
+        quality.set(
+          Module.HEAPF64.subarray(qualPtr / 8, qualPtr / 8 + qualCount),
+        );
         Module._mmg2d_free_array(qualPtr);
       }
     }
@@ -718,7 +747,7 @@ async function loadMesh2D(
 
 async function loadMeshS(
   Module: MmgModule,
-  filename: string
+  filename: string,
 ): Promise<{ mesh: MeshData; stats: MeshStats }> {
   const handle = Module._mmgs_init();
   if (handle < 0) throw new Error("Failed to initialize MMGS");
@@ -746,7 +775,7 @@ async function loadMeshS(
     const vertices = new Float64Array(vertCount * 3);
     if (vertPtr && vertCount > 0) {
       vertices.set(
-        Module.HEAPF64.subarray(vertPtr / 8, vertPtr / 8 + vertCount * 3)
+        Module.HEAPF64.subarray(vertPtr / 8, vertPtr / 8 + vertCount * 3),
       );
       Module._mmgs_free_array(vertPtr);
     }
@@ -760,7 +789,7 @@ async function loadMeshS(
     const triangles = new Int32Array(triCount * 3);
     if (triPtr && triCount > 0) {
       triangles.set(
-        Module.HEAP32.subarray(triPtr / 4, triPtr / 4 + triCount * 3)
+        Module.HEAP32.subarray(triPtr / 4, triPtr / 4 + triCount * 3),
       );
       Module._mmgs_free_array(triPtr);
     }
@@ -774,7 +803,7 @@ async function loadMeshS(
     const edges = new Int32Array(edgeCount * 2);
     if (edgePtr && edgeCount > 0) {
       edges.set(
-        Module.HEAP32.subarray(edgePtr / 4, edgePtr / 4 + edgeCount * 2)
+        Module.HEAP32.subarray(edgePtr / 4, edgePtr / 4 + edgeCount * 2),
       );
       Module._mmgs_free_array(edgePtr);
     }
@@ -783,13 +812,18 @@ async function loadMeshS(
     let quality = new Float64Array(0);
     if (triCount > 0) {
       const qualCountPtr = Module._malloc(4);
-      const qualPtr = Module._mmgs_get_triangles_qualities(handle, qualCountPtr);
+      const qualPtr = Module._mmgs_get_triangles_qualities(
+        handle,
+        qualCountPtr,
+      );
       const qualCount = Module.getValue(qualCountPtr, "i32");
       Module._free(qualCountPtr);
 
       if (qualPtr && qualCount > 0) {
         quality = new Float64Array(qualCount);
-        quality.set(Module.HEAPF64.subarray(qualPtr / 8, qualPtr / 8 + qualCount));
+        quality.set(
+          Module.HEAPF64.subarray(qualPtr / 8, qualPtr / 8 + qualCount),
+        );
         Module._mmgs_free_array(qualPtr);
       }
     }
@@ -805,7 +839,7 @@ async function loadMeshS(
 
 async function loadMesh3D(
   Module: MmgModule,
-  filename: string
+  filename: string,
 ): Promise<{ mesh: MeshData; stats: MeshStats }> {
   const handle = Module._mmg3d_init();
   if (handle < 0) throw new Error("Failed to initialize MMG3D");
@@ -825,7 +859,7 @@ async function loadMesh3D(
       sizePtr + 8,
       sizePtr + 12,
       sizePtr + 16,
-      sizePtr + 20
+      sizePtr + 20,
     );
     const nv = Module.getValue(sizePtr, "i32");
     const ne = Module.getValue(sizePtr + 4, "i32");
@@ -841,7 +875,7 @@ async function loadMesh3D(
     const vertices = new Float64Array(vertCount * 3);
     if (vertPtr && vertCount > 0) {
       vertices.set(
-        Module.HEAPF64.subarray(vertPtr / 8, vertPtr / 8 + vertCount * 3)
+        Module.HEAPF64.subarray(vertPtr / 8, vertPtr / 8 + vertCount * 3),
       );
       Module._mmg3d_free_array(vertPtr);
     }
@@ -855,7 +889,7 @@ async function loadMesh3D(
     const tetrahedra = new Int32Array(tetraCount * 4);
     if (tetraPtr && tetraCount > 0) {
       tetrahedra.set(
-        Module.HEAP32.subarray(tetraPtr / 4, tetraPtr / 4 + tetraCount * 4)
+        Module.HEAP32.subarray(tetraPtr / 4, tetraPtr / 4 + tetraCount * 4),
       );
       Module._mmg3d_free_array(tetraPtr);
     }
@@ -869,7 +903,7 @@ async function loadMesh3D(
     const triangles = new Int32Array(triCount * 3);
     if (triPtr && triCount > 0) {
       triangles.set(
-        Module.HEAP32.subarray(triPtr / 4, triPtr / 4 + triCount * 3)
+        Module.HEAP32.subarray(triPtr / 4, triPtr / 4 + triCount * 3),
       );
       Module._mmg3d_free_array(triPtr);
     }
@@ -878,13 +912,18 @@ async function loadMesh3D(
     let quality = new Float64Array(0);
     if (tetraCount > 0) {
       const qualCountPtr = Module._malloc(4);
-      const qualPtr = Module._mmg3d_get_tetrahedra_qualities(handle, qualCountPtr);
+      const qualPtr = Module._mmg3d_get_tetrahedra_qualities(
+        handle,
+        qualCountPtr,
+      );
       const qualCount = Module.getValue(qualCountPtr, "i32");
       Module._free(qualCountPtr);
 
       if (qualPtr && qualCount > 0) {
         quality = new Float64Array(qualCount);
-        quality.set(Module.HEAPF64.subarray(qualPtr / 8, qualPtr / 8 + qualCount));
+        quality.set(
+          Module.HEAPF64.subarray(qualPtr / 8, qualPtr / 8 + qualCount),
+        );
         Module._mmg3d_free_array(qualPtr);
       }
     }
@@ -902,7 +941,7 @@ async function loadMesh3D(
 async function saveMesh2D(
   Module: MmgModule,
   mesh: MeshData,
-  filepath: string
+  filepath: string,
 ): Promise<void> {
   const nVertices = mesh.vertices.length / 2;
   const nTriangles = mesh.triangles ? mesh.triangles.length / 3 : 0;
@@ -912,7 +951,13 @@ async function saveMesh2D(
   if (handle < 0) throw new Error("Failed to initialize MMG2D");
 
   try {
-    let result = Module._mmg2d_set_mesh_size(handle, nVertices, nTriangles, 0, nEdges);
+    let result = Module._mmg2d_set_mesh_size(
+      handle,
+      nVertices,
+      nTriangles,
+      0,
+      nEdges,
+    );
     if (result !== 1) throw new Error("Failed to set mesh size");
 
     const vertPtr = allocFloat64(Module, mesh.vertices);
@@ -946,7 +991,7 @@ async function saveMesh2D(
 async function saveMeshS(
   Module: MmgModule,
   mesh: MeshData,
-  filepath: string
+  filepath: string,
 ): Promise<void> {
   const nVertices = mesh.vertices.length / 3;
   const nTriangles = mesh.triangles ? mesh.triangles.length / 3 : 0;
@@ -956,7 +1001,12 @@ async function saveMeshS(
   if (handle < 0) throw new Error("Failed to initialize MMGS");
 
   try {
-    let result = Module._mmgs_set_mesh_size(handle, nVertices, nTriangles, nEdges);
+    let result = Module._mmgs_set_mesh_size(
+      handle,
+      nVertices,
+      nTriangles,
+      nEdges,
+    );
     if (result !== 1) throw new Error("Failed to set mesh size");
 
     const vertPtr = allocFloat64(Module, mesh.vertices);
@@ -990,7 +1040,7 @@ async function saveMeshS(
 async function saveMesh3D(
   Module: MmgModule,
   mesh: MeshData,
-  filepath: string
+  filepath: string,
 ): Promise<void> {
   const nVertices = mesh.vertices.length / 3;
   const nTetrahedra = mesh.tetrahedra ? mesh.tetrahedra.length / 4 : 0;
@@ -1007,7 +1057,7 @@ async function saveMesh3D(
       0,
       nTriangles,
       0,
-      0
+      0,
     );
     if (result !== 1) throw new Error("Failed to set mesh size");
 
@@ -1042,7 +1092,7 @@ async function saveMesh3D(
 // Quality computation functions
 async function computeQuality2D(
   Module: MmgModule,
-  mesh: MeshData
+  mesh: MeshData,
 ): Promise<Float64Array> {
   const nVertices = mesh.vertices.length / 2;
   const nTriangles = mesh.triangles ? mesh.triangles.length / 3 : 0;
@@ -1054,7 +1104,13 @@ async function computeQuality2D(
   if (handle < 0) throw new Error("Failed to initialize MMG2D");
 
   try {
-    let result = Module._mmg2d_set_mesh_size(handle, nVertices, nTriangles, 0, nEdges);
+    let result = Module._mmg2d_set_mesh_size(
+      handle,
+      nVertices,
+      nTriangles,
+      0,
+      nEdges,
+    );
     if (result !== 1) throw new Error("Failed to set mesh size");
 
     const vertPtr = allocFloat64(Module, mesh.vertices);
@@ -1097,7 +1153,7 @@ async function computeQuality2D(
 
 async function computeQualityS(
   Module: MmgModule,
-  mesh: MeshData
+  mesh: MeshData,
 ): Promise<Float64Array> {
   const nVertices = mesh.vertices.length / 3;
   const nTriangles = mesh.triangles ? mesh.triangles.length / 3 : 0;
@@ -1109,7 +1165,12 @@ async function computeQualityS(
   if (handle < 0) throw new Error("Failed to initialize MMGS");
 
   try {
-    let result = Module._mmgs_set_mesh_size(handle, nVertices, nTriangles, nEdges);
+    let result = Module._mmgs_set_mesh_size(
+      handle,
+      nVertices,
+      nTriangles,
+      nEdges,
+    );
     if (result !== 1) throw new Error("Failed to set mesh size");
 
     const vertPtr = allocFloat64(Module, mesh.vertices);
@@ -1152,7 +1213,7 @@ async function computeQualityS(
 
 async function computeQuality3D(
   Module: MmgModule,
-  mesh: MeshData
+  mesh: MeshData,
 ): Promise<Float64Array> {
   const nVertices = mesh.vertices.length / 3;
   const nTetrahedra = mesh.tetrahedra ? mesh.tetrahedra.length / 4 : 0;
@@ -1164,7 +1225,15 @@ async function computeQuality3D(
   if (handle < 0) throw new Error("Failed to initialize MMG3D");
 
   try {
-    let result = Module._mmg3d_set_mesh_size(handle, nVertices, nTetrahedra, 0, nTriangles, 0, 0);
+    let result = Module._mmg3d_set_mesh_size(
+      handle,
+      nVertices,
+      nTetrahedra,
+      0,
+      nTriangles,
+      0,
+      0,
+    );
     if (result !== 1) throw new Error("Failed to set mesh size");
 
     const vertPtr = allocFloat64(Module, mesh.vertices);

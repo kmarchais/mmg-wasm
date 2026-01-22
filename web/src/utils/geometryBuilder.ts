@@ -1,7 +1,7 @@
-import * as THREE from "three";
-import type { MeshData, ColormapName, QualityMetric } from "@/types/mesh";
-import { getMetricRange } from "@/utils/meshQuality";
+import type { ColormapName, MeshData, QualityMetric } from "@/types/mesh";
 import { getColor } from "@/utils/colorMapping";
+import { getMetricRange } from "@/utils/meshQuality";
+import * as THREE from "three";
 
 interface BoundingBox {
   min: THREE.Vector3;
@@ -19,7 +19,11 @@ interface GeometryResult {
 /**
  * Safely access a value from a typed array with bounds checking
  */
-function safeGet(arr: Float64Array | Float32Array | Int32Array, index: number, defaultValue = 0): number {
+function safeGet(
+  arr: Float64Array | Float32Array | Int32Array,
+  index: number,
+  defaultValue = 0,
+): number {
   if (index < 0 || index >= arr.length) return defaultValue;
   return arr[index] ?? defaultValue;
 }
@@ -31,7 +35,7 @@ export function createCenteredPositions(
   vertices: Float64Array,
   nVerts: number,
   center: THREE.Vector3,
-  is3D = true
+  is3D = true,
 ): Float32Array {
   const coordsPerVert = is3D ? 3 : 2;
   const positions = new Float32Array(nVerts * 3);
@@ -39,7 +43,9 @@ export function createCenteredPositions(
   for (let i = 0; i < nVerts; i++) {
     positions[i * 3] = safeGet(vertices, i * coordsPerVert) - center.x;
     positions[i * 3 + 1] = safeGet(vertices, i * coordsPerVert + 1) - center.y;
-    positions[i * 3 + 2] = is3D ? safeGet(vertices, i * coordsPerVert + 2) - center.z : 0;
+    positions[i * 3 + 2] = is3D
+      ? safeGet(vertices, i * coordsPerVert + 2) - center.z
+      : 0;
   }
 
   return positions;
@@ -53,7 +59,7 @@ export function buildClippedTetrahedraGeometry(
   positions: Float32Array,
   clipThreshold: number,
   qualityMetric: QualityMetric | null,
-  colormap: ColormapName
+  colormap: ColormapName,
 ): GeometryResult {
   const vertices = mesh.vertices;
   const tetrahedra = mesh.tetrahedra;
@@ -126,12 +132,20 @@ export function buildClippedTetrahedraGeometry(
   }
 
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(facePositions, 3));
+  geometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(facePositions, 3),
+  );
   geometry.computeVertexNormals();
 
   // Compute quality colors for tetrahedra faces
   let tetFaceColors: Float32Array | null = null;
-  if (qualityMetric && mesh.quality && mesh.quality.length > 0 && tetIndices.length > 0) {
+  if (
+    qualityMetric &&
+    mesh.quality &&
+    mesh.quality.length > 0 &&
+    tetIndices.length > 0
+  ) {
     const range = getMetricRange(mesh.quality);
     tetFaceColors = new Float32Array(tetIndices.length * 9);
 
@@ -179,7 +193,7 @@ export function buildClippedTetrahedraGeometry(
         safeGet(positions, start + 2),
         safeGet(positions, end),
         safeGet(positions, end + 1),
-        safeGet(positions, end + 2)
+        safeGet(positions, end + 2),
       );
     }
   }
@@ -187,13 +201,16 @@ export function buildClippedTetrahedraGeometry(
   if (linePositions.length > 0) {
     wireframeGeometry.setAttribute(
       "position",
-      new THREE.Float32BufferAttribute(linePositions, 3)
+      new THREE.Float32BufferAttribute(linePositions, 3),
     );
   }
 
   // Points geometry
   const pointsGeometry = new THREE.BufferGeometry();
-  pointsGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  pointsGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(positions, 3),
+  );
 
   return { geometry, wireframeGeometry, pointsGeometry, tetFaceColors };
 }
@@ -204,7 +221,7 @@ export function buildClippedTetrahedraGeometry(
 export function buildSurfaceGeometry(
   mesh: MeshData,
   positions: Float32Array,
-  nTris: number
+  nTris: number,
 ): GeometryResult {
   const triangles = mesh.triangles;
   const geometry = new THREE.BufferGeometry();
@@ -221,7 +238,10 @@ export function buildSurfaceGeometry(
       }
     }
 
-    geometry.setAttribute("position", new THREE.BufferAttribute(facePositions, 3));
+    geometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(facePositions, 3),
+    );
     geometry.computeVertexNormals();
   }
 
@@ -251,20 +271,23 @@ export function buildSurfaceGeometry(
           safeGet(positions, start + 2),
           safeGet(positions, end),
           safeGet(positions, end + 1),
-          safeGet(positions, end + 2)
+          safeGet(positions, end + 2),
         );
       }
     }
 
     wireframeGeometry.setAttribute(
       "position",
-      new THREE.Float32BufferAttribute(linePositions, 3)
+      new THREE.Float32BufferAttribute(linePositions, 3),
     );
   }
 
   // Create points geometry
   const pointsGeometry = new THREE.BufferGeometry();
-  pointsGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  pointsGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(positions, 3),
+  );
 
   return { geometry, wireframeGeometry, pointsGeometry, tetFaceColors: null };
 }
@@ -276,12 +299,12 @@ export function computeBoundingBox(mesh: MeshData): BoundingBox {
   const vertices = mesh.vertices;
   const nVerts = vertices.length / 3;
 
-  let minX = Infinity,
-    minY = Infinity,
-    minZ = Infinity;
-  let maxX = -Infinity,
-    maxY = -Infinity,
-    maxZ = -Infinity;
+  let minX = Number.POSITIVE_INFINITY,
+    minY = Number.POSITIVE_INFINITY,
+    minZ = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY,
+    maxY = Number.NEGATIVE_INFINITY,
+    maxZ = Number.NEGATIVE_INFINITY;
 
   for (let i = 0; i < nVerts; i++) {
     const x = safeGet(vertices, i * 3);
@@ -302,7 +325,7 @@ export function computeBoundingBox(mesh: MeshData): BoundingBox {
     center: new THREE.Vector3(
       (minX + maxX) / 2,
       (minY + maxY) / 2,
-      (minZ + maxZ) / 2
+      (minZ + maxZ) / 2,
     ),
   };
 }

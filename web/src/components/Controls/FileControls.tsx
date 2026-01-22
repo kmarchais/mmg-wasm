@@ -1,5 +1,5 @@
-import { useRef, useCallback } from "react";
-import type { MeshType, MeshData } from "@/types/mesh";
+import type { MeshData, MeshType } from "@/types/mesh";
+import { useCallback, useRef } from "react";
 
 interface FileControlsProps {
   meshType: MeshType;
@@ -29,12 +29,17 @@ export function FileControls({
         inputRef.current.value = "";
       }
     },
-    [onFileLoad]
+    [onFileLoad],
   );
 
   const handleExport = useCallback(() => {
     const ext = ".mesh";
-    const prefix = meshType === "mmg2d" ? "mesh2d" : meshType === "mmgs" ? "surface" : "mesh3d";
+    const prefix =
+      meshType === "mmg2d"
+        ? "mesh2d"
+        : meshType === "mmgs"
+          ? "surface"
+          : "mesh3d";
     const filename = `${prefix}_remeshed${ext}`;
     onExport(filename);
   }, [meshType, onExport]);
@@ -47,7 +52,7 @@ export function FileControls({
         await onFileLoad(file);
       }
     },
-    [onFileLoad]
+    [onFileLoad],
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
