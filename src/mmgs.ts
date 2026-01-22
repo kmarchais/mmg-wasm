@@ -72,6 +72,31 @@ export const MMG_RETURN_CODES_S = {
   STRONGFAILURE: 2, // The mesh is not valid
 } as const;
 
+/**
+ * Solution entity types (matching MMG5_entities enum)
+ * Specifies where solution values are defined
+ */
+export const SOL_ENTITY_S = {
+  VERTEX: 1, // MMG5_Vertex - solution defined at vertices
+} as const;
+
+/**
+ * Solution types (matching MMG5_type enum)
+ * Specifies the type of solution data
+ */
+export const SOL_TYPE_S = {
+  SCALAR: 1, // MMG5_Scalar - one value per entity (isotropic metric)
+  VECTOR: 2, // MMG5_Vector - 3 values per entity (3D vector field)
+  TENSOR: 3, // MMG5_Tensor - 6 values per entity in 3D (anisotropic metric)
+} as const;
+
+/** Solution size information */
+export interface SolInfoS {
+  typEntity: number;
+  nEntities: number;
+  typSol: number;
+}
+
 /** Internal module interface (raw Emscripten functions) */
 export interface MMGSModule extends WasmModule {
   _mmgs_init(): number;
@@ -125,6 +150,22 @@ export interface MMGSModule extends WasmModule {
   _mmgs_get_edges(handle: number, outCountPtr: number): number;
   _mmgs_set_iparameter(handle: number, iparam: number, val: number): number;
   _mmgs_set_dparameter(handle: number, dparam: number, val: number): number;
+  _mmgs_set_sol_size(
+    handle: number,
+    typEntity: number,
+    np: number,
+    typSol: number,
+  ): number;
+  _mmgs_get_sol_size(
+    handle: number,
+    typEntityPtr: number,
+    npPtr: number,
+    typSolPtr: number,
+  ): number;
+  _mmgs_set_scalar_sols(handle: number, valuesPtr: number): number;
+  _mmgs_get_scalar_sols(handle: number, outCountPtr: number): number;
+  _mmgs_set_tensor_sols(handle: number, valuesPtr: number): number;
+  _mmgs_get_tensor_sols(handle: number, outCountPtr: number): number;
   _mmgs_remesh(handle: number): number;
   _mmgs_free_array(ptr: number): void;
   _mmgs_load_mesh(handle: number, filenamePtr: number): number;
@@ -665,6 +706,181 @@ export const MMGS = {
     const result = m._mmgs_set_dparameter(handle, param, value);
     if (result !== 1) {
       throw new Error(`Failed to set double parameter ${param}`);
+    }
+  },
+
+  /**
+   * Set the solution size (allocate memory for solution data).
+   * Must be called before setting solution values.
+   * @param handle - The mesh handle
+   * @param typEntity - Entity type (use SOL_ENTITY_S.VERTEX)
+   * @param nEntities - Number of entities (typically number of vertices)
+   * @param typSol - Solution type (use SOL_TYPE_S.SCALAR or SOL_TYPE_S.TENSOR)
+   * @throws Error if allocation fails
+   */
+  setSolSize(
+    handle: MeshHandleS,
+    typEntity: number,
+    nEntities: number,
+    typSol: number,
+  ): void {
+    const m = getModule();
+    const result = m._mmgs_set_sol_size(handle, typEntity, nEntities, typSol);
+    if (result !== 1) {
+      throw new Error("Failed to set solution size");
+    }
+  },
+
+  /**
+   * Get the solution size information.
+   * @param handle - The mesh handle
+   * @returns Object containing entity type, number of entities, and solution type
+   */
+  getSolSize(handle: MeshHandleS): SolInfoS {
+    const m = getModule();
+
+    // Allocate space for 3 integers
+    const ptr = m._malloc(3 * 4);
+    if (ptr === 0) {
+      throw new Error("Failed to allocate memory for solution size");
+    }
+
+    try {
+      const result = m._mmgs_get_sol_size(handle, ptr, ptr + 4, ptr + 8);
+      if (result !== 1) {
+        throw new Error("Failed to get solution size");
+      }
+
+      return {
+        typEntity: m.getValue(ptr, "i32"),
+        nEntities: m.getValue(ptr + 4, "i32"),
+        typSol: m.getValue(ptr + 8, "i32"),
+      };
+    } finally {
+      m._free(ptr);
+    }
+  },
+
+  /**
+   * Set all scalar solution values at once.
+   * Must call setSolSize with SOL_TYPE_S.SCALAR first.
+   * @param handle - The mesh handle
+   * @param values - Float64Array of solution values (one per vertex)
+   * @throws Error if setting fails
+   */
+  setScalarSols(handle: MeshHandleS, values: Float64Array): void {
+    const m = getModule();
+
+    const valuesPtr = m._malloc(values.byteLength);
+    if (valuesPtr === 0) {
+      throw new Error("Failed to allocate memory for solution values");
+    }
+
+    try {
+      m.HEAPF64.set(values, valuesPtr / 8);
+      const result = m._mmgs_set_scalar_sols(handle, valuesPtr);
+      if (result !== 1) {
+        throw new Error("Failed to set scalar solution values");
+      }
+    } finally {
+      m._free(valuesPtr);
+    }
+  },
+
+  /**
+   * Get all scalar solution values.
+   * @param handle - The mesh handle
+   * @returns Float64Array of solution values (one per vertex)
+   * @throws Error if getting fails or solution is not scalar type
+   */
+  getScalarSols(handle: MeshHandleS): Float64Array {
+    const m = getModule();
+
+    const countPtr = m._malloc(4);
+    if (countPtr === 0) {
+      throw new Error("Failed to allocate memory for count");
+    }
+
+    try {
+      const dataPtr = m._mmgs_get_scalar_sols(handle, countPtr);
+      if (dataPtr === 0) {
+        throw new Error(
+          "Failed to get scalar solution values (wrong type or empty?)",
+        );
+      }
+
+      try {
+        const count = m.getValue(countPtr, "i32");
+        const result = new Float64Array(count);
+        result.set(m.HEAPF64.subarray(dataPtr / 8, dataPtr / 8 + count));
+        return result;
+      } finally {
+        m._mmgs_free_array(dataPtr);
+      }
+    } finally {
+      m._free(countPtr);
+    }
+  },
+
+  /**
+   * Set all tensor solution values at once.
+   * Must call setSolSize with SOL_TYPE_S.TENSOR first.
+   * @param handle - The mesh handle
+   * @param values - Float64Array of tensor values (6 components per vertex: m11, m12, m13, m22, m23, m33)
+   * @throws Error if setting fails
+   */
+  setTensorSols(handle: MeshHandleS, values: Float64Array): void {
+    const m = getModule();
+
+    const valuesPtr = m._malloc(values.byteLength);
+    if (valuesPtr === 0) {
+      throw new Error("Failed to allocate memory for tensor values");
+    }
+
+    try {
+      m.HEAPF64.set(values, valuesPtr / 8);
+      const result = m._mmgs_set_tensor_sols(handle, valuesPtr);
+      if (result !== 1) {
+        throw new Error("Failed to set tensor solution values");
+      }
+    } finally {
+      m._free(valuesPtr);
+    }
+  },
+
+  /**
+   * Get all tensor solution values.
+   * @param handle - The mesh handle
+   * @returns Float64Array of tensor values (6 components per vertex)
+   * @throws Error if getting fails or solution is not tensor type
+   */
+  getTensorSols(handle: MeshHandleS): Float64Array {
+    const m = getModule();
+
+    const countPtr = m._malloc(4);
+    if (countPtr === 0) {
+      throw new Error("Failed to allocate memory for count");
+    }
+
+    try {
+      const dataPtr = m._mmgs_get_tensor_sols(handle, countPtr);
+      if (dataPtr === 0) {
+        throw new Error(
+          "Failed to get tensor solution values (wrong type or empty?)",
+        );
+      }
+
+      try {
+        const count = m.getValue(countPtr, "i32");
+        // 6 components per vertex for 3D surface tensor
+        const result = new Float64Array(count * 6);
+        result.set(m.HEAPF64.subarray(dataPtr / 8, dataPtr / 8 + count * 6));
+        return result;
+      } finally {
+        m._mmgs_free_array(dataPtr);
+      }
+    } finally {
+      m._free(countPtr);
     }
   },
 

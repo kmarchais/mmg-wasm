@@ -4,6 +4,8 @@ import {
   IPARAM_S,
   MMGS,
   MMG_RETURN_CODES_S,
+  SOL_ENTITY_S,
+  SOL_TYPE_S,
   type MeshHandleS,
   initMMGS,
 } from "../src/mmgs";
@@ -494,6 +496,135 @@ describe("MMGS", () => {
 
       expect(size1.nVertices).toBe(4);
       expect(size2.nVertices).toBe(8);
+    });
+  });
+
+  describe("Solution/Metric Fields", () => {
+    it("should set and get solution size for scalar metric", () => {
+      const handle = MMGS.init();
+      handles.push(handle);
+
+      // Create a simple mesh first
+      MMGS.setMeshSize(handle, 4, 4, 6);
+
+      // Set solution size for scalar metric at vertices
+      MMGS.setSolSize(handle, SOL_ENTITY_S.VERTEX, 4, SOL_TYPE_S.SCALAR);
+
+      const solInfo = MMGS.getSolSize(handle);
+      expect(solInfo.typEntity).toBe(SOL_ENTITY_S.VERTEX);
+      expect(solInfo.nEntities).toBe(4);
+      expect(solInfo.typSol).toBe(SOL_TYPE_S.SCALAR);
+    });
+
+    it("should set and get scalar solution values", () => {
+      const handle = MMGS.init();
+      handles.push(handle);
+
+      // Create a simple surface mesh
+      MMGS.setMeshSize(handle, 4, 4, 6);
+
+      // Set vertices (tetrahedron surface)
+      const vertices = new Float64Array([
+        0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.5, 1.0, 0.0, 0.5, 0.5, 1.0,
+      ]);
+      MMGS.setVertices(handle, vertices);
+
+      // Set solution size for scalar metric
+      MMGS.setSolSize(handle, SOL_ENTITY_S.VERTEX, 4, SOL_TYPE_S.SCALAR);
+
+      // Set scalar values (desired edge length at each vertex)
+      const metric = new Float64Array([0.1, 0.2, 0.15, 0.25]);
+      MMGS.setScalarSols(handle, metric);
+
+      // Get back the values
+      const result = MMGS.getScalarSols(handle);
+      expect(result.length).toBe(4);
+      for (let i = 0; i < 4; i++) {
+        expect(result[i]).toBeCloseTo(metric[i]);
+      }
+    });
+
+    it("should set and get tensor solution values", () => {
+      const handle = MMGS.init();
+      handles.push(handle);
+
+      // Create a simple surface mesh
+      MMGS.setMeshSize(handle, 4, 4, 6);
+
+      // Set vertices
+      const vertices = new Float64Array([
+        0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.5, 1.0, 0.0, 0.5, 0.5, 1.0,
+      ]);
+      MMGS.setVertices(handle, vertices);
+
+      // Set solution size for tensor metric (6 components per vertex for 3D surface)
+      MMGS.setSolSize(handle, SOL_ENTITY_S.VERTEX, 4, SOL_TYPE_S.TENSOR);
+
+      // Set tensor values: m11, m12, m13, m22, m23, m33 per vertex
+      const tensorMetric = new Float64Array([
+        1.0, 0.0, 0.0, 1.0, 0.0, 1.0, // vertex 1
+        2.0, 0.0, 0.0, 2.0, 0.0, 2.0, // vertex 2
+        1.5, 0.0, 0.0, 1.5, 0.0, 1.5, // vertex 3
+        1.0, 0.0, 0.0, 1.0, 0.0, 1.0, // vertex 4
+      ]);
+      MMGS.setTensorSols(handle, tensorMetric);
+
+      // Get back the values
+      const result = MMGS.getTensorSols(handle);
+      expect(result.length).toBe(4 * 6); // 4 vertices * 6 components
+      for (let i = 0; i < tensorMetric.length; i++) {
+        expect(result[i]).toBeCloseTo(tensorMetric[i]);
+      }
+    });
+
+    it("should use scalar metric for mesh adaptation", () => {
+      const handle = MMGS.init();
+      handles.push(handle);
+
+      // Create a simple tetrahedron surface mesh
+      MMGS.setMeshSize(handle, 4, 4, 6);
+
+      // Set vertices (tetrahedron in 3D)
+      const vertices = new Float64Array([
+        0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.5, 1.0, 0.0, 0.5, 0.5, 1.0,
+      ]);
+      MMGS.setVertices(handle, vertices);
+
+      // Set triangles (surface faces)
+      const tria = new Int32Array([
+        1, 3, 2, // base
+        1, 2, 4, // front
+        2, 3, 4, // right
+        3, 1, 4, // left
+      ]);
+      MMGS.setTriangles(handle, tria);
+
+      // Set edges
+      const edges = new Int32Array([
+        1, 2, 2, 3, 3, 1, 1, 4, 2, 4, 3, 4,
+      ]);
+      MMGS.setEdges(handle, edges);
+
+      // Set solution size for scalar metric
+      MMGS.setSolSize(handle, SOL_ENTITY_S.VERTEX, 4, SOL_TYPE_S.SCALAR);
+
+      // Set small edge length to trigger refinement
+      const metric = new Float64Array([0.2, 0.2, 0.2, 0.2]);
+      MMGS.setScalarSols(handle, metric);
+
+      // Set parameters
+      MMGS.setIParam(handle, IPARAM_S.verbose, -1); // Silent
+
+      // Run remeshing
+      const result = MMGS.mmgslib(handle);
+
+      // Check result
+      expect(result).toBe(MMG_RETURN_CODES_S.SUCCESS);
+
+      // Verify mesh was refined
+      const newSize = MMGS.getMeshSize(handle);
+      expect(newSize.nVertices).toBeGreaterThan(4);
+      expect(newSize.nTriangles).toBeGreaterThan(4);
     });
   });
 });
