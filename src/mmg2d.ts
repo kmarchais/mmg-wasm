@@ -176,6 +176,8 @@ export interface MMG2DModule extends WasmModule {
   _mmg2d_save_mesh(handle: number, filenamePtr: number): number;
   _mmg2d_load_sol(handle: number, filenamePtr: number): number;
   _mmg2d_save_sol(handle: number, filenamePtr: number): number;
+  _mmg2d_get_triangle_quality(handle: number, k: number): number;
+  _mmg2d_get_triangles_qualities(handle: number, outCountPtr: number): number;
   getValue(ptr: number, type: string): number;
   setValue(ptr: number, value: number, type: string): void;
   lengthBytesUTF8(str: string): number;
@@ -198,7 +200,6 @@ export async function initMMG2D(): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore - Emscripten module doesn't have TypeScript declarations
   const createModule = (await import("../build/dist/mmg.js")).default;
-  // @ts-expect-error - Emscripten module doesn't have typed exports
   module = (await createModule()) as MMG2DModule;
 }
 
@@ -1003,6 +1004,55 @@ export const MMG2D = {
       }
     } finally {
       m._free(filenamePtr);
+    }
+  },
+
+  /**
+   * Get the quality of a single triangle.
+   * Quality values range from 0 (degenerate) to 1 (best attainable).
+   * @param handle - The mesh handle
+   * @param k - Triangle index (1-indexed, MMG convention)
+   * @returns Quality value between 0 and 1
+   */
+  getTriangleQuality(handle: MeshHandle2D, k: number): number {
+    const m = getModule();
+    return m._mmg2d_get_triangle_quality(handle, k);
+  },
+
+  /**
+   * Get quality values for all triangles.
+   * Quality values range from 0 (degenerate) to 1 (best attainable).
+   * @param handle - The mesh handle
+   * @returns Float64Array of quality values (one per triangle)
+   */
+  getTrianglesQualities(handle: MeshHandle2D): Float64Array {
+    const m = getModule();
+
+    const countPtr = m._malloc(4);
+    if (countPtr === 0) {
+      throw new Error("Failed to allocate memory");
+    }
+
+    try {
+      const dataPtr = m._mmg2d_get_triangles_qualities(handle, countPtr);
+      if (dataPtr === 0) {
+        const count = m.getValue(countPtr, "i32");
+        if (count === 0) {
+          return new Float64Array(0);
+        }
+        throw new Error("Failed to get triangles qualities");
+      }
+
+      try {
+        const count = m.getValue(countPtr, "i32");
+        const result = new Float64Array(count);
+        result.set(m.HEAPF64.subarray(dataPtr / 8, dataPtr / 8 + count));
+        return result;
+      } finally {
+        m._mmg2d_free_array(dataPtr);
+      }
+    } finally {
+      m._free(countPtr);
     }
   },
 };

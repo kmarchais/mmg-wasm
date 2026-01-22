@@ -794,3 +794,66 @@ int mmg2d_save_sol(int handle, const char* filename) {
     }
     return MMG2D_saveSol(g_handles_2d[handle].mesh, g_handles_2d[handle].sol, filename);
 }
+
+/**
+ * Get the quality of a single triangle.
+ * @param handle - The mesh handle
+ * @param k - The triangle index (1-indexed, MMG convention)
+ * @returns Quality value between 0 (degenerate) and 1 (best), or 0 on failure
+ */
+EMSCRIPTEN_KEEPALIVE
+double mmg2d_get_triangle_quality(int handle, int k) {
+    if (!validate_handle_2d(handle)) {
+        return 0.0;
+    }
+    return MMG2D_Get_triangleQuality(
+        g_handles_2d[handle].mesh,
+        g_handles_2d[handle].sol,
+        (MMG5_int)k
+    );
+}
+
+/**
+ * Get quality values for all triangles.
+ * Allocates and returns a pointer to the quality array.
+ * out_count receives the number of triangles.
+ * Caller must free the returned pointer using mmg2d_free_array.
+ * Returns NULL on failure.
+ */
+EMSCRIPTEN_KEEPALIVE
+double* mmg2d_get_triangles_qualities(int handle, int* out_count) {
+    if (!validate_handle_2d(handle)) {
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    MMG5_int np, nt, nquad, na;
+    if (MMG2D_Get_meshSize(g_handles_2d[handle].mesh, &np, &nt, &nquad, &na) != 1) {
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    if (nt == 0) {
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    /* Allocate output array */
+    double* qualities = (double*)malloc(nt * sizeof(double));
+    if (!qualities) {
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    /* Get quality for each triangle (1-indexed) */
+    for (MMG5_int k = 1; k <= nt; k++) {
+        qualities[k - 1] = MMG2D_Get_triangleQuality(
+            g_handles_2d[handle].mesh,
+            g_handles_2d[handle].sol,
+            k
+        );
+    }
+
+    if (out_count) *out_count = (int)nt;
+    return qualities;
+}
