@@ -88,6 +88,13 @@ export {
 // Export RemeshResult
 export type { RemeshResult } from "./result";
 
+// Export Web Worker API
+export {
+  MeshWorker,
+  remeshInWorker,
+  type ProgressInfo,
+} from "./worker";
+
 // Export memory utilities
 export {
   toWasmFloat64,
