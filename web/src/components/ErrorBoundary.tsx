@@ -1,4 +1,4 @@
-import { Component, type ReactNode, type ErrorInfo } from "react";
+import { Component, type ErrorInfo, type ReactNode } from "react";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -15,7 +15,10 @@ interface ErrorBoundaryState {
  * Error boundary component to catch and handle errors in child components.
  * Particularly useful for catching WebGL/Three.js errors in Canvas components.
  */
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+export class ErrorBoundary extends Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -61,8 +64,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             Rendering Error
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400 text-center mb-4 max-w-md">
-            An error occurred while rendering the 3D viewer. This may be due to WebGL
-            compatibility issues or invalid mesh data.
+            An error occurred while rendering the 3D viewer. This may be due to
+            WebGL compatibility issues or invalid mesh data.
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-500 mb-4 font-mono max-w-md break-all">
             {this.state.error?.message}
@@ -86,13 +89,20 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
  * Specialized error boundary for 3D Canvas components.
  * Provides a more specific error message for WebGL/Three.js errors.
  */
-export function CanvasErrorBoundary({ children }: { children: ReactNode }): ReactNode {
+export function CanvasErrorBoundary({
+  children,
+}: { children: ReactNode }): ReactNode {
   return (
     <ErrorBoundary
       onError={(error) => {
         // Log WebGL-specific information if available
-        if (error.message.includes("WebGL") || error.message.includes("THREE")) {
-          console.error("WebGL/Three.js error detected. Check browser WebGL support.");
+        if (
+          error.message.includes("WebGL") ||
+          error.message.includes("THREE")
+        ) {
+          console.error(
+            "WebGL/Three.js error detected. Check browser WebGL support.",
+          );
         }
       }}
       fallback={
@@ -116,8 +126,8 @@ export function CanvasErrorBoundary({ children }: { children: ReactNode }): Reac
             3D Viewer Unavailable
           </h3>
           <p className="text-sm text-gray-500 dark:text-gray-400 text-center max-w-md">
-            Unable to render the 3D mesh. Please ensure your browser supports WebGL
-            and try refreshing the page.
+            Unable to render the 3D mesh. Please ensure your browser supports
+            WebGL and try refreshing the page.
           </p>
         </div>
       }

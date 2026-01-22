@@ -17,9 +17,14 @@ export function MeshStats({
 
   const getChange = (
     before: number | undefined | null,
-    after: number | undefined | null
+    after: number | undefined | null,
   ): { value: string; className: string } | null => {
-    if (before === undefined || before === null || after === undefined || after === null) {
+    if (
+      before === undefined ||
+      before === null ||
+      after === undefined ||
+      after === null
+    ) {
       return null;
     }
     if (before === 0) return null;
@@ -28,7 +33,12 @@ export function MeshStats({
     const sign = change > 0 ? "+" : "";
     return {
       value: `${sign}${change.toFixed(1)}%`,
-      className: change > 0 ? "text-red-600" : change < 0 ? "text-green-600" : "text-gray-500",
+      className:
+        change > 0
+          ? "text-red-600"
+          : change < 0
+            ? "text-green-600"
+            : "text-gray-500",
     };
   };
 
@@ -83,7 +93,9 @@ export function MeshStats({
                 <td className="text-right font-mono">
                   {formatValue(row.after)}
                 </td>
-                <td className={`text-right font-mono text-sm ${change?.className ?? ""}`}>
+                <td
+                  className={`text-right font-mono text-sm ${change?.className ?? ""}`}
+                >
                   {change?.value ?? "-"}
                 </td>
               </tr>

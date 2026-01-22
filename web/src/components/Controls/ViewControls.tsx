@@ -1,5 +1,5 @@
 import { useMeshStore } from "@/stores/meshStore";
-import type { ColormapName, QualityMetric, MeshType } from "@/types/mesh";
+import type { ColormapName, MeshType, QualityMetric } from "@/types/mesh";
 
 const colormaps: { id: ColormapName; label: string }[] = [
   { id: "RdYlBu", label: "RdYlBu" },
@@ -18,7 +18,10 @@ interface ViewControlsProps {
   meshType?: MeshType;
 }
 
-export function ViewControls({ show3DControls = true, meshType }: ViewControlsProps) {
+export function ViewControls({
+  show3DControls = true,
+  meshType,
+}: ViewControlsProps) {
   const {
     viewerOptions,
     setViewerOption,
@@ -38,7 +41,9 @@ export function ViewControls({ show3DControls = true, meshType }: ViewControlsPr
             onChange={(e) => setViewerOption("showWireframe", e.target.checked)}
             className="rounded border-gray-300 dark:border-gray-600"
           />
-          <span className="text-sm text-gray-700 dark:text-gray-300">Show wireframe</span>
+          <span className="text-sm text-gray-700 dark:text-gray-300">
+            Show wireframe
+          </span>
         </label>
 
         <label className="flex items-center gap-2 cursor-pointer">
@@ -48,7 +53,9 @@ export function ViewControls({ show3DControls = true, meshType }: ViewControlsPr
             onChange={(e) => setViewerOption("showVertices", e.target.checked)}
             className="rounded border-gray-300 dark:border-gray-600"
           />
-          <span className="text-sm text-gray-700 dark:text-gray-300">Show vertices</span>
+          <span className="text-sm text-gray-700 dark:text-gray-300">
+            Show vertices
+          </span>
         </label>
 
         {show3DControls && (
@@ -59,7 +66,9 @@ export function ViewControls({ show3DControls = true, meshType }: ViewControlsPr
               onChange={(e) => setViewerOption("showFaces", e.target.checked)}
               className="rounded border-gray-300 dark:border-gray-600"
             />
-            <span className="text-sm text-gray-700 dark:text-gray-300">Show faces</span>
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              Show faces
+            </span>
           </label>
         )}
       </div>
@@ -73,7 +82,7 @@ export function ViewControls({ show3DControls = true, meshType }: ViewControlsPr
               onChange={(e) =>
                 setViewerOption(
                   "qualityMetric",
-                  e.target.value ? (e.target.value as QualityMetric) : null
+                  e.target.value ? (e.target.value as QualityMetric) : null,
                 )
               }
               className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 shadow-sm text-sm"
@@ -115,7 +124,9 @@ export function ViewControls({ show3DControls = true, meshType }: ViewControlsPr
                 max="1"
                 step="0.01"
                 value={clippingPosition}
-                onChange={(e) => setClippingPosition(parseFloat(e.target.value))}
+                onChange={(e) =>
+                  setClippingPosition(Number.parseFloat(e.target.value))
+                }
                 className="w-full"
               />
             </div>

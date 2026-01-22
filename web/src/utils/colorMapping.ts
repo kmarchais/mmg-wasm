@@ -91,21 +91,24 @@ export function getColor(
   value: number,
   min: number,
   max: number,
-  colormap: ColormapName
+  colormap: ColormapName,
 ): Color {
   const range = max - min;
   const t = range > 0 ? (value - min) / range : 0.5;
-  const [r, g, b] = interpolateColor(colormaps[colormap] ?? colormaps.RdYlBu, t);
+  const [r, g, b] = interpolateColor(
+    colormaps[colormap] ?? colormaps.RdYlBu,
+    t,
+  );
   return new Color(r, g, b);
 }
 
 export function getColorArray(
   values: Float32Array | Float64Array,
-  colormap: ColormapName
+  colormap: ColormapName,
 ): Float32Array {
   const colors = new Float32Array(values.length * 3);
-  let min = Infinity;
-  let max = -Infinity;
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
 
   for (let i = 0; i < values.length; i++) {
     const v = values[i]!;

@@ -31,12 +31,7 @@ export interface RemeshParams {
   hgrad?: number;
 }
 
-export type ColormapName =
-  | "RdYlBu"
-  | "viridis"
-  | "plasma"
-  | "coolwarm"
-  | "jet";
+export type ColormapName = "RdYlBu" | "viridis" | "plasma" | "coolwarm" | "jet";
 
 export type QualityMetric = "mmgQuality";
 

@@ -23,45 +23,52 @@ export interface MmgModule {
     np: number,
     nt: number,
     nq: number,
-    na: number
+    na: number,
   ) => number;
   _mmg2d_get_mesh_size: (
     handle: number,
     npPtr: number,
     ntPtr: number,
     nqPtr: number,
-    naPtr: number
+    naPtr: number,
   ) => number;
   _mmg2d_set_vertices: (
     handle: number,
     verticesPtr: number,
-    refsPtr: number
+    refsPtr: number,
   ) => number;
   _mmg2d_get_vertices: (handle: number, countPtr: number) => number;
   _mmg2d_set_triangles: (
     handle: number,
     triPtr: number,
-    refsPtr: number
+    refsPtr: number,
   ) => number;
   _mmg2d_get_triangles: (handle: number, countPtr: number) => number;
   _mmg2d_set_edges: (
     handle: number,
     edgesPtr: number,
-    refsPtr: number
+    refsPtr: number,
   ) => number;
   _mmg2d_get_edges: (handle: number, countPtr: number) => number;
-  _mmg2d_set_iparameter: (handle: number, iparam: number, val: number) => number;
+  _mmg2d_set_iparameter: (
+    handle: number,
+    iparam: number,
+    val: number,
+  ) => number;
   _mmg2d_set_dparameter: (
     handle: number,
     dparam: number,
-    val: number
+    val: number,
   ) => number;
   _mmg2d_remesh: (handle: number) => number;
   _mmg2d_free_array: (ptr: number) => void;
   _mmg2d_load_mesh: (handle: number, filenamePtr: number) => number;
   _mmg2d_save_mesh: (handle: number, filenamePtr: number) => number;
   _mmg2d_get_triangle_quality: (handle: number, k: number) => number;
-  _mmg2d_get_triangles_qualities: (handle: number, outCountPtr: number) => number;
+  _mmg2d_get_triangles_qualities: (
+    handle: number,
+    outCountPtr: number,
+  ) => number;
 
   // MMGS functions
   _mmgs_init: () => number;
@@ -70,30 +77,30 @@ export interface MmgModule {
     handle: number,
     np: number,
     nt: number,
-    na: number
+    na: number,
   ) => number;
   _mmgs_get_mesh_size: (
     handle: number,
     npPtr: number,
     ntPtr: number,
-    naPtr: number
+    naPtr: number,
   ) => number;
   _mmgs_set_vertices: (
     handle: number,
     verticesPtr: number,
-    refsPtr: number
+    refsPtr: number,
   ) => number;
   _mmgs_get_vertices: (handle: number, countPtr: number) => number;
   _mmgs_set_triangles: (
     handle: number,
     triPtr: number,
-    refsPtr: number
+    refsPtr: number,
   ) => number;
   _mmgs_get_triangles: (handle: number, countPtr: number) => number;
   _mmgs_set_edges: (
     handle: number,
     edgesPtr: number,
-    refsPtr: number
+    refsPtr: number,
   ) => number;
   _mmgs_get_edges: (handle: number, countPtr: number) => number;
   _mmgs_set_iparameter: (handle: number, iparam: number, val: number) => number;
@@ -103,7 +110,10 @@ export interface MmgModule {
   _mmgs_load_mesh: (handle: number, filenamePtr: number) => number;
   _mmgs_save_mesh: (handle: number, filenamePtr: number) => number;
   _mmgs_get_triangle_quality: (handle: number, k: number) => number;
-  _mmgs_get_triangles_qualities: (handle: number, outCountPtr: number) => number;
+  _mmgs_get_triangles_qualities: (
+    handle: number,
+    outCountPtr: number,
+  ) => number;
 
   // MMG3D functions
   _mmg3d_init: () => number;
@@ -115,7 +125,7 @@ export interface MmgModule {
     nprism: number,
     nt: number,
     nquad: number,
-    na: number
+    na: number,
   ) => number;
   _mmg3d_get_mesh_size: (
     handle: number,
@@ -124,38 +134,45 @@ export interface MmgModule {
     nprismPtr: number,
     ntPtr: number,
     nquadPtr: number,
-    naPtr: number
+    naPtr: number,
   ) => number;
   _mmg3d_set_vertices: (
     handle: number,
     verticesPtr: number,
-    refsPtr: number
+    refsPtr: number,
   ) => number;
   _mmg3d_get_vertices: (handle: number, countPtr: number) => number;
   _mmg3d_set_tetrahedra: (
     handle: number,
     tetraPtr: number,
-    refsPtr: number
+    refsPtr: number,
   ) => number;
   _mmg3d_get_tetrahedra: (handle: number, countPtr: number) => number;
   _mmg3d_set_triangles: (
     handle: number,
     triPtr: number,
-    refsPtr: number
+    refsPtr: number,
   ) => number;
   _mmg3d_get_triangles: (handle: number, countPtr: number) => number;
-  _mmg3d_set_iparameter: (handle: number, iparam: number, val: number) => number;
+  _mmg3d_set_iparameter: (
+    handle: number,
+    iparam: number,
+    val: number,
+  ) => number;
   _mmg3d_set_dparameter: (
     handle: number,
     dparam: number,
-    val: number
+    val: number,
   ) => number;
   _mmg3d_remesh: (handle: number) => number;
   _mmg3d_free_array: (ptr: number) => void;
   _mmg3d_load_mesh: (handle: number, filenamePtr: number) => number;
   _mmg3d_save_mesh: (handle: number, filenamePtr: number) => number;
   _mmg3d_get_tetrahedron_quality: (handle: number, k: number) => number;
-  _mmg3d_get_tetrahedra_qualities: (handle: number, outCountPtr: number) => number;
+  _mmg3d_get_tetrahedra_qualities: (
+    handle: number,
+    outCountPtr: number,
+  ) => number;
 
   // String helpers
   lengthBytesUTF8: (str: string) => number;

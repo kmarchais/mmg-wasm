@@ -1,8 +1,8 @@
-import { useEffect, useRef, useMemo } from "react";
 import { useMeshStore } from "@/stores/meshStore";
 import type { MeshData } from "@/types/mesh";
-import { getMetricRange } from "@/utils/meshQuality";
 import { getColor } from "@/utils/colorMapping";
+import { getMetricRange } from "@/utils/meshQuality";
+import { useEffect, useMemo, useRef } from "react";
 
 interface MeshViewer2DProps {
   mesh: MeshData | null;
@@ -14,7 +14,12 @@ export function MeshViewer2D({ mesh }: MeshViewer2DProps) {
 
   // Use stored quality from mesh data
   const qualityData = useMemo(() => {
-    if (!mesh?.quality || mesh.quality.length === 0 || !viewerOptions.qualityMetric) return null;
+    if (
+      !mesh?.quality ||
+      mesh.quality.length === 0 ||
+      !viewerOptions.qualityMetric
+    )
+      return null;
     const range = getMetricRange(mesh.quality);
     return { quality: mesh.quality, ...range };
   }, [mesh, viewerOptions.qualityMetric]);
@@ -39,10 +44,10 @@ export function MeshViewer2D({ mesh }: MeshViewer2DProps) {
 
     // Compute bounding box
     const vertices = mesh.vertices;
-    let minX = Infinity,
-      minY = Infinity,
-      maxX = -Infinity,
-      maxY = -Infinity;
+    let minX = Number.POSITIVE_INFINITY,
+      minY = Number.POSITIVE_INFINITY,
+      maxX = Number.NEGATIVE_INFINITY,
+      maxY = Number.NEGATIVE_INFINITY;
     for (let i = 0; i < vertices.length; i += 2) {
       const x = vertices[i]!;
       const y = vertices[i + 1]!;
@@ -56,15 +61,13 @@ export function MeshViewer2D({ mesh }: MeshViewer2DProps) {
     const meshHeight = maxY - minY || 1;
     const scale = Math.min(
       (width - 2 * padding) / meshWidth,
-      (height - 2 * padding) / meshHeight
+      (height - 2 * padding) / meshHeight,
     );
 
     const offsetX =
-      padding + ((width - 2 * padding) - meshWidth * scale) / 2 - minX * scale;
+      padding + (width - 2 * padding - meshWidth * scale) / 2 - minX * scale;
     const offsetY =
-      padding +
-      ((height - 2 * padding) - meshHeight * scale) / 2 -
-      minY * scale;
+      padding + (height - 2 * padding - meshHeight * scale) / 2 - minY * scale;
 
     const transformX = (x: number) => offsetX + x * scale;
     const transformY = (y: number) => height - (offsetY + y * scale);
@@ -88,7 +91,7 @@ export function MeshViewer2D({ mesh }: MeshViewer2DProps) {
             qualityData.quality[i]!,
             qualityData.min,
             qualityData.max,
-            viewerOptions.colormap
+            viewerOptions.colormap,
           );
 
           ctx.fillStyle = `rgb(${Math.round(color.r * 255)}, ${Math.round(color.g * 255)}, ${Math.round(color.b * 255)})`;
@@ -132,7 +135,7 @@ export function MeshViewer2D({ mesh }: MeshViewer2DProps) {
           transformY(vertices[i * 2 + 1]!),
           2,
           0,
-          Math.PI * 2
+          Math.PI * 2,
         );
         ctx.fill();
       }

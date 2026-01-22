@@ -175,6 +175,53 @@ function getScaledConfig(config: ParameterConfig, scale: number) {
   return { min, max, default: defaultVal, step };
 }
 
+interface Preset {
+  name: string;
+  description: string;
+  getParams: (scale: number) => Partial<RemeshParams>;
+}
+
+const presets: Preset[] = [
+  {
+    name: "Fine",
+    description: "Small elements, high detail",
+    getParams: (scale) => ({
+      hmax: scale * 0.05,
+      hausd: scale * 0.001,
+      hgrad: 1.1,
+    }),
+  },
+  {
+    name: "Default",
+    description: "Balanced settings",
+    getParams: (scale) => ({
+      hmax: scale * 0.1,
+      hausd: scale * 0.01,
+      hgrad: 1.3,
+    }),
+  },
+  {
+    name: "Coarse",
+    description: "Large elements, fast",
+    getParams: (scale) => ({
+      hmax: scale * 0.3,
+      hausd: scale * 0.05,
+      hgrad: 1.5,
+    }),
+  },
+  {
+    name: "Optimize",
+    description: "Quality only, no size change",
+    getParams: () => ({
+      hmax: undefined,
+      hmin: undefined,
+      hsiz: undefined,
+      hausd: undefined,
+      hgrad: 1.3,
+    }),
+  },
+];
+
 interface ParameterPanelProps {
   meshType: MeshType;
   onRemesh: () => void;
@@ -186,18 +233,51 @@ export function ParameterPanel({
   onRemesh,
   disabled,
 }: ParameterPanelProps) {
-  const { params, setParams, liveRemesh, setLiveRemesh, meshData } = useMeshStore();
+  const { params, setParams, liveRemesh, setLiveRemesh, meshData } =
+    useMeshStore();
   const currentParams = params[meshType];
   const configs = parameterConfigs[meshType];
   const meshScale = meshData[meshType].scale;
 
-  const handleParamChange = (key: keyof RemeshParams, value: number | undefined) => {
+  const handleParamChange = (
+    key: keyof RemeshParams,
+    value: number | undefined,
+  ) => {
     setParams(meshType, { [key]: value });
+  };
+
+  const applyPreset = (preset: Preset) => {
+    const presetParams = preset.getParams(meshScale);
+    // Reset all params first, then apply preset
+    setParams(meshType, {
+      hmax: undefined,
+      hmin: undefined,
+      hsiz: undefined,
+      hausd: undefined,
+      hgrad: undefined,
+      ...presetParams,
+    });
   };
 
   return (
     <div className="panel">
       <h2 className="panel-header">Remeshing Parameters</h2>
+
+      {/* Preset buttons */}
+      <div className="grid grid-cols-4 gap-1 mb-4">
+        {presets.map((preset) => (
+          <button
+            type="button"
+            key={preset.name}
+            onClick={() => applyPreset(preset)}
+            disabled={disabled}
+            className="btn btn-secondary text-xs py-1 px-2"
+            title={preset.description}
+          >
+            {preset.name}
+          </button>
+        ))}
+      </div>
 
       <div className="space-y-4">
         {configs.map((config) => {
@@ -238,13 +318,18 @@ export function ParameterPanel({
                   step={scaled.step}
                   value={value ?? scaled.default}
                   onChange={(e) =>
-                    handleParamChange(config.key, parseFloat(e.target.value))
+                    handleParamChange(
+                      config.key,
+                      Number.parseFloat(e.target.value),
+                    )
                   }
                   className="slider-track"
                   disabled={disabled}
                 />
               )}
-              <p className="text-xs text-gray-500 dark:text-gray-400">{config.description}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {config.description}
+              </p>
             </div>
           );
         })}

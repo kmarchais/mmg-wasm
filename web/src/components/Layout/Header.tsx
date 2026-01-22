@@ -1,6 +1,6 @@
-import { useRef, useCallback } from "react";
 import { useMeshStore } from "@/stores/meshStore";
 import type { MeshType } from "@/types/mesh";
+import { useCallback, useRef } from "react";
 
 const tabs: { id: MeshType; label: string; description: string }[] = [
   { id: "mmg2d", label: "2D (MMG2D)", description: "2D triangular mesh" },
@@ -15,7 +15,8 @@ interface HeaderProps {
 }
 
 export function Header({ onFileLoad, onExport, disabled }: HeaderProps) {
-  const { theme, toggleTheme, activeMeshType, setActiveMeshType } = useMeshStore();
+  const { theme, toggleTheme, activeMeshType, setActiveMeshType } =
+    useMeshStore();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = useCallback(
@@ -28,7 +29,7 @@ export function Header({ onFileLoad, onExport, disabled }: HeaderProps) {
         inputRef.current.value = "";
       }
     },
-    [onFileLoad]
+    [onFileLoad],
   );
 
   return (
@@ -120,10 +121,17 @@ export function Header({ onFileLoad, onExport, disabled }: HeaderProps) {
           <button
             onClick={toggleTheme}
             className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-            title={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+            title={
+              theme === "light" ? "Switch to dark mode" : "Switch to light mode"
+            }
           >
             {theme === "light" ? (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -132,7 +140,12 @@ export function Header({ onFileLoad, onExport, disabled }: HeaderProps) {
                 />
               </svg>
             ) : (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"

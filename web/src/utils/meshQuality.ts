@@ -1,4 +1,4 @@
-import type { QualityMetric, MeshData } from "@/types/mesh";
+import type { MeshData, QualityMetric } from "@/types/mesh";
 
 export function getMetricLabel(metric: QualityMetric): string {
   switch (metric) {
@@ -7,11 +7,12 @@ export function getMetricLabel(metric: QualityMetric): string {
   }
 }
 
-export function getMetricRange(
-  quality: Float32Array | Float64Array
-): { min: number; max: number } {
-  let min = Infinity;
-  let max = -Infinity;
+export function getMetricRange(quality: Float32Array | Float64Array): {
+  min: number;
+  max: number;
+} {
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
 
   for (let i = 0; i < quality.length; i++) {
     const v = quality[i]!;
@@ -33,8 +34,12 @@ export function getMeshScale(mesh: MeshData, is2D: boolean): number {
 
   if (nVertices === 0) return 1;
 
-  let minX = Infinity, minY = Infinity, minZ = Infinity;
-  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  let minX = Number.POSITIVE_INFINITY,
+    minY = Number.POSITIVE_INFINITY,
+    minZ = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY,
+    maxY = Number.NEGATIVE_INFINITY,
+    maxZ = Number.NEGATIVE_INFINITY;
 
   for (let i = 0; i < nVertices; i++) {
     const x = vertices[i * dim]!;
