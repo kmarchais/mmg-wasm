@@ -483,6 +483,154 @@ export class Mesh {
   }
 
   // =====================
+  // Metric Field Methods
+  // =====================
+
+  /**
+   * Set isotropic metric field for adaptive remeshing
+   *
+   * The metric field specifies target edge sizes at each vertex.
+   * Smaller values produce finer mesh elements.
+   *
+   * @param values - Scalar value per vertex (one value per vertex)
+   * @returns this (for method chaining)
+   * @throws Error if mesh has been disposed or values length doesn't match
+   *
+   * @example
+   * ```typescript
+   * // Create a metric field with varying sizes
+   * const metric = new Float64Array(mesh.nVertices);
+   * for (let i = 0; i < mesh.nVertices; i++) {
+   *   // Smaller values = finer mesh
+   *   metric[i] = 0.1;
+   * }
+   * mesh.setMetric(metric);
+   * const result = await mesh.remesh();
+   * ```
+   */
+  setMetric(values: Float64Array): this {
+    this.checkDisposed();
+
+    const nVertices = this.nVertices;
+    if (values.length !== nVertices) {
+      throw new Error(
+        `Metric array length (${values.length}) must match number of vertices (${nVertices})`,
+      );
+    }
+
+    // Set solution size and values based on mesh type
+    switch (this._type) {
+      case MeshType.Mesh2D:
+        MMG2D.setSolSize(
+          this._handle as MeshHandle2D,
+          SOL_ENTITY_2D.VERTEX,
+          nVertices,
+          SOL_TYPE_2D.SCALAR,
+        );
+        MMG2D.setScalarSols(this._handle as MeshHandle2D, values);
+        break;
+      case MeshType.Mesh3D:
+        MMG3D.setSolSize(
+          this._handle as MeshHandle,
+          SOL_ENTITY.VERTEX,
+          nVertices,
+          SOL_TYPE.SCALAR,
+        );
+        MMG3D.setScalarSols(this._handle as MeshHandle, values);
+        break;
+      case MeshType.MeshS:
+        MMGS.setSolSize(
+          this._handle as MeshHandleS,
+          SOL_ENTITY_S.VERTEX,
+          nVertices,
+          SOL_TYPE_S.SCALAR,
+        );
+        MMGS.setScalarSols(this._handle as MeshHandleS, values);
+        break;
+    }
+
+    return this;
+  }
+
+  /**
+   * Set anisotropic metric tensor field for adaptive remeshing
+   *
+   * The metric tensor allows specifying directionally-dependent edge sizes.
+   * For 3D meshes: 6 components per vertex (symmetric tensor: m11, m12, m13, m22, m23, m33)
+   * For 2D meshes: 3 components per vertex (symmetric tensor: m11, m12, m22)
+   *
+   * @param values - Tensor components per vertex
+   * @returns this (for method chaining)
+   * @throws Error if mesh has been disposed or values length doesn't match
+   *
+   * @example
+   * ```typescript
+   * // 3D mesh: 6 tensor components per vertex
+   * const nVertices = mesh.nVertices;
+   * const tensor = new Float64Array(nVertices * 6);
+   * for (let i = 0; i < nVertices; i++) {
+   *   const offset = i * 6;
+   *   // Identity metric scaled by 0.1 (uniform 0.1 edge size)
+   *   const scale = 1 / (0.1 * 0.1);
+   *   tensor[offset + 0] = scale; // m11
+   *   tensor[offset + 1] = 0;     // m12
+   *   tensor[offset + 2] = 0;     // m13
+   *   tensor[offset + 3] = scale; // m22
+   *   tensor[offset + 4] = 0;     // m23
+   *   tensor[offset + 5] = scale; // m33
+   * }
+   * mesh.setMetricTensor(tensor);
+   * const result = await mesh.remesh();
+   * ```
+   */
+  setMetricTensor(values: Float64Array): this {
+    this.checkDisposed();
+
+    const nVertices = this.nVertices;
+    const componentsPerVertex = this._type === MeshType.Mesh2D ? 3 : 6;
+    const expectedLength = nVertices * componentsPerVertex;
+
+    if (values.length !== expectedLength) {
+      throw new Error(
+        `Tensor array length (${values.length}) must be ${componentsPerVertex} components × ${nVertices} vertices = ${expectedLength}`,
+      );
+    }
+
+    // Set solution size and values based on mesh type
+    switch (this._type) {
+      case MeshType.Mesh2D:
+        MMG2D.setSolSize(
+          this._handle as MeshHandle2D,
+          SOL_ENTITY_2D.VERTEX,
+          nVertices,
+          SOL_TYPE_2D.TENSOR,
+        );
+        MMG2D.setTensorSols(this._handle as MeshHandle2D, values);
+        break;
+      case MeshType.Mesh3D:
+        MMG3D.setSolSize(
+          this._handle as MeshHandle,
+          SOL_ENTITY.VERTEX,
+          nVertices,
+          SOL_TYPE.TENSOR,
+        );
+        MMG3D.setTensorSols(this._handle as MeshHandle, values);
+        break;
+      case MeshType.MeshS:
+        MMGS.setSolSize(
+          this._handle as MeshHandleS,
+          SOL_ENTITY_S.VERTEX,
+          nVertices,
+          SOL_TYPE_S.TENSOR,
+        );
+        MMGS.setTensorSols(this._handle as MeshHandleS, values);
+        break;
+    }
+
+    return this;
+  }
+
+  // =====================
   // Export Methods
   // =====================
 

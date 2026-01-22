@@ -1028,5 +1028,237 @@ describe("Mesh Class", () => {
         expect(result.nVertices).toBeGreaterThan(originalVertexCount);
       });
     });
+
+    describe("setMetric()", () => {
+      it("should set isotropic metric on 3D mesh", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+        });
+        meshes.push(mesh);
+
+        const metric = new Float64Array(mesh.nVertices);
+        for (let i = 0; i < mesh.nVertices; i++) {
+          metric[i] = 0.2;
+        }
+
+        mesh.setMetric(metric);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+        expect(result.nVertices).toBeGreaterThan(mesh.nVertices);
+      });
+
+      it("should set isotropic metric on 2D mesh", async () => {
+        const mesh = new Mesh({
+          vertices: squareVertices,
+          cells: squareTriangles,
+        });
+        meshes.push(mesh);
+
+        const metric = new Float64Array(mesh.nVertices);
+        for (let i = 0; i < mesh.nVertices; i++) {
+          metric[i] = 0.2;
+        }
+
+        mesh.setMetric(metric);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+        expect(result.nVertices).toBeGreaterThan(mesh.nVertices);
+      });
+
+      it("should set isotropic metric on surface mesh", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTriangles,
+          type: MeshType.MeshS,
+        });
+        meshes.push(mesh);
+
+        const metric = new Float64Array(mesh.nVertices);
+        for (let i = 0; i < mesh.nVertices; i++) {
+          metric[i] = 0.2;
+        }
+
+        mesh.setMetric(metric);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+        expect(result.nVertices).toBeGreaterThan(mesh.nVertices);
+      });
+
+      it("should throw for wrong metric array length", () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+        });
+        meshes.push(mesh);
+
+        const wrongMetric = new Float64Array(5);
+        expect(() => mesh.setMetric(wrongMetric)).toThrow(/must match/);
+      });
+
+      it("should throw after dispose", () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+        });
+        const nVertices = mesh.nVertices;
+        mesh.free();
+
+        const metric = new Float64Array(nVertices);
+        expect(() => mesh.setMetric(metric)).toThrow(/disposed/);
+      });
+
+      it("should support method chaining", () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+        });
+        meshes.push(mesh);
+
+        const metric = new Float64Array(mesh.nVertices).fill(0.2);
+        const result = mesh.setMetric(metric);
+        expect(result).toBe(mesh);
+      });
+    });
+
+    describe("setMetricTensor()", () => {
+      it("should set anisotropic tensor metric on 3D mesh", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+        });
+        meshes.push(mesh);
+
+        const tensor = new Float64Array(mesh.nVertices * 6);
+        for (let i = 0; i < mesh.nVertices; i++) {
+          const idx = i * 6;
+          tensor[idx + 0] = 25.0; // m11
+          tensor[idx + 1] = 0.0; // m12
+          tensor[idx + 2] = 0.0; // m13
+          tensor[idx + 3] = 25.0; // m22
+          tensor[idx + 4] = 0.0; // m23
+          tensor[idx + 5] = 25.0; // m33
+        }
+
+        mesh.setMetricTensor(tensor);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+        expect(result.nVertices).toBeGreaterThan(mesh.nVertices);
+      });
+
+      it("should set anisotropic tensor metric on 2D mesh", async () => {
+        const mesh = new Mesh({
+          vertices: squareVertices,
+          cells: squareTriangles,
+        });
+        meshes.push(mesh);
+
+        const tensor = new Float64Array(mesh.nVertices * 3);
+        for (let i = 0; i < mesh.nVertices; i++) {
+          const idx = i * 3;
+          tensor[idx + 0] = 25.0; // m11
+          tensor[idx + 1] = 0.0; // m12
+          tensor[idx + 2] = 25.0; // m22
+        }
+
+        mesh.setMetricTensor(tensor);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+        expect(result.nVertices).toBeGreaterThan(mesh.nVertices);
+      });
+
+      it("should set anisotropic tensor metric on surface mesh", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTriangles,
+          type: MeshType.MeshS,
+        });
+        meshes.push(mesh);
+
+        const tensor = new Float64Array(mesh.nVertices * 6);
+        for (let i = 0; i < mesh.nVertices; i++) {
+          const idx = i * 6;
+          tensor[idx + 0] = 25.0;
+          tensor[idx + 1] = 0.0;
+          tensor[idx + 2] = 0.0;
+          tensor[idx + 3] = 25.0;
+          tensor[idx + 4] = 0.0;
+          tensor[idx + 5] = 25.0;
+        }
+
+        mesh.setMetricTensor(tensor);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+        expect(result.nVertices).toBeGreaterThan(mesh.nVertices);
+      });
+
+      it("should throw for wrong tensor array length (3D)", () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+        });
+        meshes.push(mesh);
+
+        const wrongTensor = new Float64Array(mesh.nVertices * 3);
+        expect(() => mesh.setMetricTensor(wrongTensor)).toThrow(
+          /6 components/,
+        );
+      });
+
+      it("should throw for wrong tensor array length (2D)", () => {
+        const mesh = new Mesh({
+          vertices: squareVertices,
+          cells: squareTriangles,
+        });
+        meshes.push(mesh);
+
+        const wrongTensor = new Float64Array(mesh.nVertices * 6);
+        expect(() => mesh.setMetricTensor(wrongTensor)).toThrow(
+          /3 components/,
+        );
+      });
+
+      it("should throw after dispose", () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+        });
+        const nVertices = mesh.nVertices;
+        mesh.free();
+
+        const tensor = new Float64Array(nVertices * 6);
+        expect(() => mesh.setMetricTensor(tensor)).toThrow(/disposed/);
+      });
+
+      it("should support method chaining", () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+        });
+        meshes.push(mesh);
+
+        const tensor = new Float64Array(mesh.nVertices * 6);
+        const result = mesh.setMetricTensor(tensor);
+        expect(result).toBe(mesh);
+      });
+    });
   });
 });
