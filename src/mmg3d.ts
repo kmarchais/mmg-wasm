@@ -214,10 +214,10 @@ export async function initMMG3D(): Promise<void> {
   }
 
   // Dynamic import of the Emscripten-generated module
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore - Emscripten module doesn't have TypeScript declarations
+  // The Emscripten-generated module doesn't have TypeScript declarations,
+  // so we cast through unknown to the properly typed interface
   const createModule = (await import("../build/dist/mmg.js")).default;
-  module = (await createModule()) as MMG3DModule;
+  module = (await createModule()) as unknown as MMG3DModule;
 }
 
 /**
