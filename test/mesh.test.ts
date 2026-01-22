@@ -2,7 +2,6 @@ import { describe, expect, it, beforeAll, afterEach } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Mesh, MeshType, RemeshPresets } from "../src";
-import type { RemeshResult } from "../src/result";
 import { initMMG3D } from "../src/mmg3d";
 import { initMMG2D } from "../src/mmg2d";
 import { initMMGS } from "../src/mmgs";
