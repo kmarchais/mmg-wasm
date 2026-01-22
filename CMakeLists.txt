@@ -38,7 +38,7 @@ target_include_directories(mmg PRIVATE
     ${mmg_SOURCE_DIR}/src
 )
 
-# Exported functions for JavaScript bindings (62 total)
+# Exported functions for JavaScript bindings (74 total)
 set(MMG_EXPORTED_FUNCTIONS
     # Existing exports (5)
     '_mmg_version'
@@ -46,7 +46,7 @@ set(MMG_EXPORTED_FUNCTIONS
     '_mmg_test_init'
     '_malloc'
     '_free'
-    # MMG3D wrapper functions (19)
+    # MMG3D wrapper functions (23)
     '_mmg3d_init'
     '_mmg3d_free'
     '_mmg3d_get_available_handles'
@@ -66,7 +66,11 @@ set(MMG_EXPORTED_FUNCTIONS
     '_mmg3d_set_dparameter'
     '_mmg3d_remesh'
     '_mmg3d_free_array'
-    # MMG2D wrapper functions (19)
+    '_mmg3d_load_mesh'
+    '_mmg3d_save_mesh'
+    '_mmg3d_load_sol'
+    '_mmg3d_save_sol'
+    # MMG2D wrapper functions (23)
     '_mmg2d_init'
     '_mmg2d_free'
     '_mmg2d_get_available_handles'
@@ -86,7 +90,11 @@ set(MMG_EXPORTED_FUNCTIONS
     '_mmg2d_set_dparameter'
     '_mmg2d_remesh'
     '_mmg2d_free_array'
-    # MMGS wrapper functions (19)
+    '_mmg2d_load_mesh'
+    '_mmg2d_save_mesh'
+    '_mmg2d_load_sol'
+    '_mmg2d_save_sol'
+    # MMGS wrapper functions (23)
     '_mmgs_init'
     '_mmgs_free'
     '_mmgs_get_available_handles'
@@ -106,6 +114,10 @@ set(MMG_EXPORTED_FUNCTIONS
     '_mmgs_set_dparameter'
     '_mmgs_remesh'
     '_mmgs_free_array'
+    '_mmgs_load_mesh'
+    '_mmgs_save_mesh'
+    '_mmgs_load_sol'
+    '_mmgs_save_sol'
 )
 list(JOIN MMG_EXPORTED_FUNCTIONS "," MMG_EXPORTED_FUNCTIONS_STR)
 

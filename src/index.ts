@@ -5,6 +5,7 @@
 export {
   initMMG3D,
   getWasmModule,
+  getFS,
   MMG3D,
   IPARAM,
   DPARAM,
@@ -20,6 +21,7 @@ export {
 export {
   initMMG2D,
   getWasmModule2D,
+  getFS2D,
   MMG2D,
   IPARAM_2D,
   DPARAM_2D,
@@ -35,6 +37,7 @@ export {
 export {
   initMMGS,
   getWasmModuleS,
+  getFSS,
   MMGS,
   IPARAM_S,
   DPARAM_S,
@@ -45,6 +48,9 @@ export {
   type DParamKeyS,
   type MMGSModule,
 } from "./mmgs";
+
+// Export FS types
+export type { EmscriptenFS, PathAnalysis } from "./fs";
 
 // Export memory utilities
 export {

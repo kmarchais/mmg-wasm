@@ -5,6 +5,7 @@
  * Uses Emscripten's cwrap to call the C wrapper functions.
  */
 
+import type { EmscriptenFS } from "./fs";
 import type { WasmModule } from "./memory";
 
 /**
@@ -147,8 +148,15 @@ export interface MMG3DModule extends WasmModule {
   _mmg3d_set_dparameter(handle: number, dparam: number, val: number): number;
   _mmg3d_remesh(handle: number): number;
   _mmg3d_free_array(ptr: number): void;
+  _mmg3d_load_mesh(handle: number, filenamePtr: number): number;
+  _mmg3d_save_mesh(handle: number, filenamePtr: number): number;
+  _mmg3d_load_sol(handle: number, filenamePtr: number): number;
+  _mmg3d_save_sol(handle: number, filenamePtr: number): number;
   getValue(ptr: number, type: string): number;
   setValue(ptr: number, value: number, type: string): void;
+  lengthBytesUTF8(str: string): number;
+  stringToUTF8(str: string, ptr: number, maxBytes: number): void;
+  FS: EmscriptenFS;
 }
 
 let module: MMG3DModule | null = null;
@@ -715,4 +723,130 @@ export const MMG3D = {
     const m = getModule();
     return m._mmg3d_remesh(handle);
   },
+
+  /**
+   * Load a mesh from a file in the virtual filesystem.
+   * Use FS.writeFile() to write mesh data to the virtual filesystem first.
+   * @param handle - The mesh handle
+   * @param filename - Path to the mesh file in the virtual filesystem
+   * @throws Error if loading fails
+   */
+  loadMesh(handle: MeshHandle, filename: string): void {
+    const m = getModule();
+    const filenameLen = m.lengthBytesUTF8(filename) + 1;
+    const filenamePtr = m._malloc(filenameLen);
+    if (filenamePtr === 0) {
+      throw new Error("Failed to allocate memory for filename");
+    }
+    try {
+      m.stringToUTF8(filename, filenamePtr, filenameLen);
+      const result = m._mmg3d_load_mesh(handle, filenamePtr);
+      if (result !== 1) {
+        throw new Error(`Failed to load mesh from ${filename}`);
+      }
+    } finally {
+      m._free(filenamePtr);
+    }
+  },
+
+  /**
+   * Save a mesh to a file in the virtual filesystem.
+   * Use FS.readFile() to retrieve the file data after saving.
+   * @param handle - The mesh handle
+   * @param filename - Path to save the mesh file in the virtual filesystem
+   * @throws Error if saving fails
+   */
+  saveMesh(handle: MeshHandle, filename: string): void {
+    const m = getModule();
+    const filenameLen = m.lengthBytesUTF8(filename) + 1;
+    const filenamePtr = m._malloc(filenameLen);
+    if (filenamePtr === 0) {
+      throw new Error("Failed to allocate memory for filename");
+    }
+    try {
+      m.stringToUTF8(filename, filenamePtr, filenameLen);
+      const result = m._mmg3d_save_mesh(handle, filenamePtr);
+      if (result !== 1) {
+        throw new Error(`Failed to save mesh to ${filename}`);
+      }
+    } finally {
+      m._free(filenamePtr);
+    }
+  },
+
+  /**
+   * Load a solution from a file in the virtual filesystem.
+   * Use FS.writeFile() to write solution data to the virtual filesystem first.
+   * @param handle - The mesh handle
+   * @param filename - Path to the solution file in the virtual filesystem
+   * @throws Error if loading fails
+   */
+  loadSol(handle: MeshHandle, filename: string): void {
+    const m = getModule();
+    const filenameLen = m.lengthBytesUTF8(filename) + 1;
+    const filenamePtr = m._malloc(filenameLen);
+    if (filenamePtr === 0) {
+      throw new Error("Failed to allocate memory for filename");
+    }
+    try {
+      m.stringToUTF8(filename, filenamePtr, filenameLen);
+      const result = m._mmg3d_load_sol(handle, filenamePtr);
+      if (result !== 1) {
+        throw new Error(`Failed to load solution from ${filename}`);
+      }
+    } finally {
+      m._free(filenamePtr);
+    }
+  },
+
+  /**
+   * Save a solution to a file in the virtual filesystem.
+   * Use FS.readFile() to retrieve the file data after saving.
+   * @param handle - The mesh handle
+   * @param filename - Path to save the solution file in the virtual filesystem
+   * @throws Error if saving fails
+   */
+  saveSol(handle: MeshHandle, filename: string): void {
+    const m = getModule();
+    const filenameLen = m.lengthBytesUTF8(filename) + 1;
+    const filenamePtr = m._malloc(filenameLen);
+    if (filenamePtr === 0) {
+      throw new Error("Failed to allocate memory for filename");
+    }
+    try {
+      m.stringToUTF8(filename, filenamePtr, filenameLen);
+      const result = m._mmg3d_save_sol(handle, filenamePtr);
+      if (result !== 1) {
+        throw new Error(`Failed to save solution to ${filename}`);
+      }
+    } finally {
+      m._free(filenamePtr);
+    }
+  },
 };
+
+/**
+ * Get the Emscripten virtual filesystem interface.
+ * Use this to read/write mesh files to the virtual filesystem.
+ *
+ * @example
+ * ```ts
+ * const FS = getFS();
+ * // Write mesh data to virtual filesystem
+ * FS.writeFile('/input.mesh', meshData);
+ * // Load and process mesh
+ * const handle = MMG3D.init();
+ * MMG3D.loadMesh(handle, '/input.mesh');
+ * MMG3D.mmg3dlib(handle);
+ * MMG3D.saveMesh(handle, '/output.mesh');
+ * // Read result from virtual filesystem
+ * const result = FS.readFile('/output.mesh', { encoding: 'binary' });
+ * ```
+ *
+ * @returns The Emscripten FS interface
+ * @throws Error if module not initialized
+ */
+export function getFS(): EmscriptenFS {
+  const m = getModule();
+  return m.FS;
+}

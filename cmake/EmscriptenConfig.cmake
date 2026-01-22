@@ -62,13 +62,14 @@ set(MMG_WASM_LINK_FLAGS
 
     # Export malloc/free for memory management from JS
     -sEXPORTED_FUNCTIONS=['_malloc','_free']
-    -sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','UTF8ToString','stringToUTF8','getValue','setValue','HEAP32','HEAPF64','HEAPU8']
+    -sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','UTF8ToString','stringToUTF8','lengthBytesUTF8','getValue','setValue','HEAP32','HEAPF64','HEAPU8','FS']
 )
 
 # Additional flags for Release builds
+# Note: --closure=1 is NOT used because it minifies the FS API method names
+# which breaks the file I/O bindings (FS.writeFile, FS.readFile, etc.)
 set(MMG_WASM_LINK_FLAGS_RELEASE
     -O3
-    --closure=1
     -flto
 )
 

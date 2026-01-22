@@ -566,3 +566,59 @@ void mmgs_free_array(void* ptr) {
         free(ptr);
     }
 }
+
+/**
+ * Load a mesh from a file in the virtual filesystem.
+ * @param handle - The mesh handle
+ * @param filename - Path to the mesh file in the virtual filesystem
+ * @returns 1 on success, 0 on failure
+ */
+EMSCRIPTEN_KEEPALIVE
+int mmgs_load_mesh(int handle, const char* filename) {
+    if (!validate_handle_s(handle)) {
+        return 0;
+    }
+    return MMGS_loadMesh(g_handles_s[handle].mesh, filename);
+}
+
+/**
+ * Save a mesh to a file in the virtual filesystem.
+ * @param handle - The mesh handle
+ * @param filename - Path to save the mesh file in the virtual filesystem
+ * @returns 1 on success, 0 on failure
+ */
+EMSCRIPTEN_KEEPALIVE
+int mmgs_save_mesh(int handle, const char* filename) {
+    if (!validate_handle_s(handle)) {
+        return 0;
+    }
+    return MMGS_saveMesh(g_handles_s[handle].mesh, filename);
+}
+
+/**
+ * Load a solution from a file in the virtual filesystem.
+ * @param handle - The mesh handle
+ * @param filename - Path to the solution file in the virtual filesystem
+ * @returns 1 on success, 0 on failure
+ */
+EMSCRIPTEN_KEEPALIVE
+int mmgs_load_sol(int handle, const char* filename) {
+    if (!validate_handle_s(handle)) {
+        return 0;
+    }
+    return MMGS_loadSol(g_handles_s[handle].mesh, g_handles_s[handle].sol, filename);
+}
+
+/**
+ * Save a solution to a file in the virtual filesystem.
+ * @param handle - The mesh handle
+ * @param filename - Path to save the solution file in the virtual filesystem
+ * @returns 1 on success, 0 on failure
+ */
+EMSCRIPTEN_KEEPALIVE
+int mmgs_save_sol(int handle, const char* filename) {
+    if (!validate_handle_s(handle)) {
+        return 0;
+    }
+    return MMGS_saveSol(g_handles_s[handle].mesh, g_handles_s[handle].sol, filename);
+}
