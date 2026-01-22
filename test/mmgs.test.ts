@@ -477,6 +477,60 @@ describe("MMGS", () => {
       const newTria = MMGS.getTriangles(handle);
       expect(newTria.length).toBe(newSize.nTriangles * 3);
     });
+
+    it("should produce more triangles with smaller hmax parameter", () => {
+      // Test that smaller hmax value results in more triangles
+      // (finer mesh resolution)
+
+      // Helper to create and remesh tetrahedron with given hmax
+      const createAndRemesh = (hmax: number): number => {
+        const handle = MMGS.init();
+        handles.push(handle);
+
+        MMGS.setMeshSize(handle, 4, 4, 6);
+
+        const vertices = new Float64Array([
+          0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.5, 1.0, 0.0, 0.5, 0.5, 1.0,
+        ]);
+        MMGS.setVertices(handle, vertices);
+
+        const tria = new Int32Array([
+          1,
+          3,
+          2, // base
+          1,
+          2,
+          4, // front
+          2,
+          3,
+          4, // right
+          3,
+          1,
+          4, // left
+        ]);
+        MMGS.setTriangles(handle, tria);
+
+        const edges = new Int32Array([1, 2, 2, 3, 3, 1, 1, 4, 2, 4, 3, 4]);
+        MMGS.setEdges(handle, edges);
+
+        MMGS.setIParam(handle, IPARAM_S.verbose, -1);
+        MMGS.setDParam(handle, DPARAM_S.hmax, hmax);
+
+        const result = MMGS.mmgslib(handle);
+        expect(result).toBe(MMG_RETURN_CODES_S.SUCCESS);
+
+        return MMGS.getMeshSize(handle).nTriangles;
+      };
+
+      // Coarse mesh (larger hmax = larger elements)
+      const nTrianglesCoarse = createAndRemesh(0.5);
+
+      // Fine mesh (smaller hmax = smaller elements = more triangles)
+      const nTrianglesFine = createAndRemesh(0.2);
+
+      // Smaller hmax = more triangles
+      expect(nTrianglesFine).toBeGreaterThan(nTrianglesCoarse);
+    });
   });
 
   describe("Multiple Handles", () => {
@@ -562,10 +616,30 @@ describe("MMGS", () => {
 
       // Set tensor values: m11, m12, m13, m22, m23, m33 per vertex
       const tensorMetric = new Float64Array([
-        1.0, 0.0, 0.0, 1.0, 0.0, 1.0, // vertex 1
-        2.0, 0.0, 0.0, 2.0, 0.0, 2.0, // vertex 2
-        1.5, 0.0, 0.0, 1.5, 0.0, 1.5, // vertex 3
-        1.0, 0.0, 0.0, 1.0, 0.0, 1.0, // vertex 4
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        1.0, // vertex 1
+        2.0,
+        0.0,
+        0.0,
+        2.0,
+        0.0,
+        2.0, // vertex 2
+        1.5,
+        0.0,
+        0.0,
+        1.5,
+        0.0,
+        1.5, // vertex 3
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        1.0, // vertex 4
       ]);
       MMGS.setTensorSols(handle, tensorMetric);
 
@@ -592,17 +666,23 @@ describe("MMGS", () => {
 
       // Set triangles (surface faces)
       const tria = new Int32Array([
-        1, 3, 2, // base
-        1, 2, 4, // front
-        2, 3, 4, // right
-        3, 1, 4, // left
+        1,
+        3,
+        2, // base
+        1,
+        2,
+        4, // front
+        2,
+        3,
+        4, // right
+        3,
+        1,
+        4, // left
       ]);
       MMGS.setTriangles(handle, tria);
 
       // Set edges
-      const edges = new Int32Array([
-        1, 2, 2, 3, 3, 1, 1, 4, 2, 4, 3, 4,
-      ]);
+      const edges = new Int32Array([1, 2, 2, 3, 3, 1, 1, 4, 2, 4, 3, 4]);
       MMGS.setEdges(handle, edges);
 
       // Set solution size for scalar metric
