@@ -7,8 +7,8 @@
  * on various mesh sizes to track performance regressions.
  */
 
-import { beforeAll, describe, expect, it } from "bun:test";
-import { Mesh, MeshType, type RemeshResult, getMemoryStats } from "../src";
+import { describe, expect, it } from "bun:test";
+import { Mesh, MeshType, type RemeshResult } from "../src";
 
 interface BenchmarkResult {
   name: string;

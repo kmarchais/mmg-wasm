@@ -126,9 +126,11 @@ echo ""
 
 # Output for CI (machine-readable)
 if [ "$CI_MODE" = true ]; then
-    echo "::set-output name=wasm_size::$WASM_SIZE"
-    echo "::set-output name=wasm_gzip::$WASM_GZIP"
-    echo "::set-output name=total_gzip::$TOTAL_GZIP"
+    if [ -n "$GITHUB_OUTPUT" ]; then
+        echo "wasm_size=$WASM_SIZE" >> "$GITHUB_OUTPUT"
+        echo "wasm_gzip=$WASM_GZIP" >> "$GITHUB_OUTPUT"
+        echo "total_gzip=$TOTAL_GZIP" >> "$GITHUB_OUTPUT"
+    fi
 
     if [ "$FAILED" = true ]; then
         echo -e "${RED}Bundle size check FAILED${NC}"
