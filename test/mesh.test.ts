@@ -1512,18 +1512,11 @@ describe("Mesh Class", () => {
 
         expect(result.success).toBe(true);
 
-        // Count vertices along cylinder axis vs far from it
-        // Use a larger radius to capture more vertices
+        // Count vertices along cylinder axis
         const alongAxis = countVerticesInSphere(
           result.mesh.vertices,
           [0.5, 0.5, 0.5],
           0.35,
-        );
-        // Compare to a region away from the cylinder (top of cube, away from the axis)
-        const awayFromCylinder = countVerticesInSphere(
-          result.mesh.vertices,
-          [0.5, 0.5, 0],
-          0.2,
         );
 
         // More vertices should be along the refined cylinder axis
