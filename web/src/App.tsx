@@ -1,4 +1,5 @@
 import {
+  PaintPanel,
   ParameterPanel,
   SampleSelector,
   ViewControls,
@@ -17,6 +18,7 @@ import {
 } from "@/fixtures/defaultMeshes";
 import { useMmgWasm } from "@/hooks/useMmgWasm";
 import { useMeshStore } from "@/stores/meshStore";
+import { usePaintStore } from "@/stores/paintStore";
 import { getMeshScale, getMetricRange } from "@/utils/meshQuality";
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 
@@ -38,8 +40,16 @@ export default function App() {
     setParams,
   } = useMeshStore();
 
-  const { isLoaded, remesh, loadMeshFile, saveMeshFile, computeQuality } =
-    useMmgWasm();
+  const { sizeFields, clearSizeField, setPaintModeEnabled } = usePaintStore();
+
+  const {
+    isLoaded,
+    remesh,
+    remeshWithSizeField,
+    loadMeshFile,
+    saveMeshFile,
+    computeQuality,
+  } = useMmgWasm();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Ref to hold the latest handleRemesh without causing re-runs
@@ -160,6 +170,62 @@ export default function App() {
     handleRemeshRef.current = handleRemesh;
   }, [handleRemesh]);
 
+  const handleRemeshWithPaint = useCallback(async () => {
+    if (!isLoaded) return;
+
+    const currentData = meshData[activeMeshType];
+    const inputMesh = currentData.before;
+    const sizeField = sizeFields[activeMeshType];
+
+    if (!inputMesh || !sizeField) {
+      setStatusMessage({
+        type: "warning",
+        message: "No size field painted. Paint on the mesh first.",
+      });
+      return;
+    }
+
+    setIsRemeshing(true);
+    setShowOriginalMesh(false);
+    try {
+      const result = await remeshWithSizeField(
+        activeMeshType,
+        inputMesh,
+        params[activeMeshType],
+        sizeField,
+      );
+      setMeshAfter(activeMeshType, result.mesh, result.stats);
+      // Clear the size field after applying
+      clearSizeField(activeMeshType);
+      // Disable paint mode
+      setPaintModeEnabled(false);
+      setStatusMessage({
+        type: "success",
+        message: `Remeshed with size field: ${result.stats.nVertices} vertices, ${result.stats.nTriangles} triangles`,
+      });
+    } catch (err) {
+      setStatusMessage({
+        type: "error",
+        message: `Remesh with size field failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+      });
+    } finally {
+      setIsRemeshing(false);
+    }
+  }, [
+    isLoaded,
+    activeMeshType,
+    meshData,
+    params,
+    sizeFields,
+    remeshWithSizeField,
+    setMeshAfter,
+    setIsRemeshing,
+    setStatusMessage,
+    setShowOriginalMesh,
+    clearSizeField,
+    setPaintModeEnabled,
+  ]);
+
   const handleFileLoad = useCallback(
     async (file: File) => {
       if (!isLoaded) return;
@@ -170,6 +236,8 @@ export default function App() {
         const is2D = activeMeshType === "mmg2d";
         const scale = getMeshScale(result.mesh, is2D);
         setMeshBefore(activeMeshType, result.mesh, result.stats, scale);
+        // Clear any existing size field when loading new mesh
+        clearSizeField(activeMeshType);
         setStatusMessage({
           type: "success",
           message: `Loaded: ${file.name}`,
@@ -200,6 +268,7 @@ export default function App() {
       setMeshAfter,
       setIsRemeshing,
       setStatusMessage,
+      clearSizeField,
     ],
   );
 
@@ -259,6 +328,8 @@ export default function App() {
           sample.stats,
           scale,
         );
+        // Clear any existing size field when loading new sample
+        clearSizeField(activeMeshType);
         setStatusMessage({
           type: "success",
           message: `Loaded sample: ${sample.name}`,
@@ -289,6 +360,7 @@ export default function App() {
       setMeshAfter,
       setIsRemeshing,
       setStatusMessage,
+      clearSizeField,
     ],
   );
 
@@ -332,6 +404,10 @@ export default function App() {
             onRemesh={handleRemesh}
             disabled={disabled}
           />
+          <PaintPanel
+            disabled={disabled}
+            onApplyPaint={handleRemeshWithPaint}
+          />
           <SampleSelector
             meshType={activeMeshType}
             onSelect={handleSampleSelect}
@@ -369,9 +445,9 @@ export default function App() {
           )}
           <div className="flex-1 relative min-h-0">
             {is2D ? (
-              <MeshViewer2D mesh={displayMesh} />
+              <MeshViewer2D mesh={displayMesh} meshType={activeMeshType} />
             ) : (
-              <MeshViewer3D mesh={displayMesh} />
+              <MeshViewer3D mesh={displayMesh} meshType={activeMeshType} />
             )}
             <MeshStatsOverlay meshType={activeMeshType} stats={displayStats} />
             {showOriginalMesh && (
