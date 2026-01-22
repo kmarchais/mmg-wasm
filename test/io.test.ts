@@ -1,32 +1,32 @@
-import { describe, expect, it, beforeAll, afterEach } from "bun:test";
+import { afterEach, beforeAll, describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  initMMG3D,
-  MMG3D,
-  getFS,
-  IPARAM,
-  SOL_ENTITY,
-  SOL_TYPE,
-  type MeshHandle,
-} from "../src/mmg3d";
-import {
-  initMMG2D,
-  MMG2D,
-  getFS2D,
   IPARAM_2D,
+  MMG2D,
+  type MeshHandle2D,
   SOL_ENTITY_2D,
   SOL_TYPE_2D,
-  type MeshHandle2D,
+  getFS2D,
+  initMMG2D,
 } from "../src/mmg2d";
 import {
-  initMMGS,
-  MMGS,
-  getFSS,
+  IPARAM,
+  MMG3D,
+  type MeshHandle,
+  SOL_ENTITY,
+  SOL_TYPE,
+  getFS,
+  initMMG3D,
+} from "../src/mmg3d";
+import {
   IPARAM_S,
+  MMGS,
+  type MeshHandleS,
   SOL_ENTITY_S,
   SOL_TYPE_S,
-  type MeshHandleS,
+  getFSS,
+  initMMGS,
 } from "../src/mmgs";
 
 describe("File I/O", () => {

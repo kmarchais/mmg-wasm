@@ -1,13 +1,13 @@
-import { describe, expect, it, beforeAll, afterEach } from "bun:test";
+import { afterEach, beforeAll, describe, expect, it } from "bun:test";
 import {
-  initMMG3D,
-  MMG3D,
-  IPARAM,
   DPARAM,
+  IPARAM,
+  MMG3D,
   MMG_RETURN_CODES,
+  type MeshHandle,
   SOL_ENTITY,
   SOL_TYPE,
-  type MeshHandle,
+  initMMG3D,
 } from "../src/mmg3d";
 
 describe("MMG3D", () => {

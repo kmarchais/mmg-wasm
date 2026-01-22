@@ -1,22 +1,22 @@
 import { afterEach, beforeAll, describe, expect, it } from "bun:test";
-import { IPARAM, MMG3D, type MeshHandle, initMMG3D } from "../src/mmg3d";
 import { IPARAM_2D, MMG2D, type MeshHandle2D, initMMG2D } from "../src/mmg2d";
+import { IPARAM, MMG3D, type MeshHandle, initMMG3D } from "../src/mmg3d";
 import { IPARAM_S, MMGS, type MeshHandleS, initMMGS } from "../src/mmgs";
 import {
-  cubeVertices,
+  nTriangles as cubeNTriangles,
+  nVertices as cubeNVertices,
   cubeTetrahedra,
   cubeTriangles,
-  nVertices as cubeNVertices,
+  cubeVertices,
   nTetrahedra,
-  nTriangles as cubeNTriangles,
 } from "./fixtures/cube";
 import {
-  squareVertices,
-  squareTriangles,
   squareEdges,
-  nVertices as squareNVertices,
-  nTriangles as squareNTriangles,
   nEdges as squareNEdges,
+  nTriangles as squareNTriangles,
+  nVertices as squareNVertices,
+  squareTriangles,
+  squareVertices,
 } from "./fixtures/square";
 
 describe("Quality Functions", () => {
