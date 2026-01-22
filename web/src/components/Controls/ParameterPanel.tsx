@@ -267,6 +267,7 @@ export function ParameterPanel({
       <div className="grid grid-cols-4 gap-1 mb-4">
         {presets.map((preset) => (
           <button
+            type="button"
             key={preset.name}
             onClick={() => applyPreset(preset)}
             disabled={disabled}
