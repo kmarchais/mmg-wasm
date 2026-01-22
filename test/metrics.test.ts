@@ -1,46 +1,46 @@
 import { afterEach, beforeAll, describe, expect, it } from "bun:test";
 import {
-  IPARAM,
-  MMG3D,
-  MMG_RETURN_CODES,
-  SOL_ENTITY,
-  SOL_TYPE,
-  type MeshHandle,
-  initMMG3D,
-} from "../src/mmg3d";
-import {
   IPARAM_2D,
   MMG2D,
   MMG_RETURN_CODES_2D,
+  type MeshHandle2D,
   SOL_ENTITY_2D,
   SOL_TYPE_2D,
-  type MeshHandle2D,
   initMMG2D,
 } from "../src/mmg2d";
+import {
+  IPARAM,
+  MMG3D,
+  MMG_RETURN_CODES,
+  type MeshHandle,
+  SOL_ENTITY,
+  SOL_TYPE,
+  initMMG3D,
+} from "../src/mmg3d";
 import {
   IPARAM_S,
   MMGS,
   MMG_RETURN_CODES_S,
+  type MeshHandleS,
   SOL_ENTITY_S,
   SOL_TYPE_S,
-  type MeshHandleS,
   initMMGS,
 } from "../src/mmgs";
 import {
-  cubeVertices,
+  nTriangles as cubeNTriangles,
+  nVertices as cubeNVertices,
   cubeTetrahedra,
   cubeTriangles,
-  nVertices as cubeNVertices,
+  cubeVertices,
   nTetrahedra,
-  nTriangles as cubeNTriangles,
 } from "./fixtures/cube";
 import {
-  squareVertices,
-  squareTriangles,
   squareEdges,
-  nVertices as squareNVertices,
-  nTriangles as squareNTriangles,
   nEdges as squareNEdges,
+  nTriangles as squareNTriangles,
+  nVertices as squareNVertices,
+  squareTriangles,
+  squareVertices,
 } from "./fixtures/square";
 
 describe("Metric Fields", () => {

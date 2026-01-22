@@ -4,9 +4,9 @@ import {
   IPARAM_S,
   MMGS,
   MMG_RETURN_CODES_S,
+  type MeshHandleS,
   SOL_ENTITY_S,
   SOL_TYPE_S,
-  type MeshHandleS,
   initMMGS,
 } from "../src/mmgs";
 

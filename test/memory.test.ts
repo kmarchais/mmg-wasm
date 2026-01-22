@@ -1,20 +1,20 @@
-import { describe, expect, it, beforeAll, beforeEach, mock } from "bun:test";
-import { initMMG3D, getWasmModule, type MMG3DModule } from "../src/mmg3d";
+import { beforeAll, beforeEach, describe, expect, it, mock } from "bun:test";
 import {
-  toWasmFloat64,
-  toWasmInt32,
-  toWasmUint32,
+  MemoryError,
+  checkMemoryAvailable,
+  configureMemory,
+  estimateMeshMemory,
+  freeWasmArray,
   fromWasmFloat64,
   fromWasmInt32,
   fromWasmUint32,
-  freeWasmArray,
   getMemoryStats,
-  configureMemory,
-  checkMemoryAvailable,
-  estimateMeshMemory,
   resetMemoryTracking,
-  MemoryError,
+  toWasmFloat64,
+  toWasmInt32,
+  toWasmUint32,
 } from "../src/memory";
+import { type MMG3DModule, getWasmModule, initMMG3D } from "../src/mmg3d";
 
 describe("Memory Utilities", () => {
   let module: MMG3DModule;
@@ -1095,7 +1095,7 @@ describe("Memory Utilities", () => {
 
       if (available < requiredBytes * 1.5) {
         console.log(
-          `Skipping large Int32 allocation test: insufficient memory`,
+          "Skipping large Int32 allocation test: insufficient memory",
         );
         return;
       }

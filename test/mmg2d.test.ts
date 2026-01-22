@@ -4,9 +4,9 @@ import {
   IPARAM_2D,
   MMG2D,
   MMG_RETURN_CODES_2D,
+  type MeshHandle2D,
   SOL_ENTITY_2D,
   SOL_TYPE_2D,
-  type MeshHandle2D,
   initMMG2D,
 } from "../src/mmg2d";
 

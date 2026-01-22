@@ -1,4 +1,8 @@
 import { afterEach, beforeAll, describe, expect, it } from "bun:test";
+import { MeshType } from "../src/mesh";
+import { MMG2D, type MeshHandle2D, initMMG2D } from "../src/mmg2d";
+import { MMG3D, type MeshHandle, initMMG3D } from "../src/mmg3d";
+import { MMGS, type MeshHandleS, initMMGS } from "../src/mmgs";
 import {
   type RemeshOptions,
   RemeshOptionsError,
@@ -6,10 +10,6 @@ import {
   applyOptions,
   validateOptions,
 } from "../src/options";
-import { MeshType } from "../src/mesh";
-import { MMG3D, initMMG3D, type MeshHandle } from "../src/mmg3d";
-import { MMG2D, initMMG2D, type MeshHandle2D } from "../src/mmg2d";
-import { MMGS, initMMGS, type MeshHandleS } from "../src/mmgs";
 
 describe("RemeshOptions Validation", () => {
   describe("hmin/hmax constraints", () => {
@@ -164,43 +164,43 @@ describe("RemeshOptions Validation", () => {
 
   describe("NaN constraints", () => {
     it("throws when hmin is NaN", () => {
-      expect(() => validateOptions({ hmin: NaN })).toThrow(
+      expect(() => validateOptions({ hmin: Number.NaN })).toThrow(
         "hmin must not be NaN",
       );
     });
 
     it("throws when hmax is NaN", () => {
-      expect(() => validateOptions({ hmax: NaN })).toThrow(
+      expect(() => validateOptions({ hmax: Number.NaN })).toThrow(
         "hmax must not be NaN",
       );
     });
 
     it("throws when hsiz is NaN", () => {
-      expect(() => validateOptions({ hsiz: NaN })).toThrow(
+      expect(() => validateOptions({ hsiz: Number.NaN })).toThrow(
         "hsiz must not be NaN",
       );
     });
 
     it("throws when hausd is NaN", () => {
-      expect(() => validateOptions({ hausd: NaN })).toThrow(
+      expect(() => validateOptions({ hausd: Number.NaN })).toThrow(
         "hausd must not be NaN",
       );
     });
 
     it("throws when hgrad is NaN", () => {
-      expect(() => validateOptions({ hgrad: NaN })).toThrow(
+      expect(() => validateOptions({ hgrad: Number.NaN })).toThrow(
         "hgrad must not be NaN",
       );
     });
 
     it("throws when angleDetection is NaN", () => {
-      expect(() => validateOptions({ angleDetection: NaN })).toThrow(
+      expect(() => validateOptions({ angleDetection: Number.NaN })).toThrow(
         "angleDetection must not be NaN",
       );
     });
 
     it("throws when verbose is NaN", () => {
-      expect(() => validateOptions({ verbose: NaN })).toThrow(
+      expect(() => validateOptions({ verbose: Number.NaN })).toThrow(
         "verbose must not be NaN",
       );
     });

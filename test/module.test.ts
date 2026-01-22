@@ -1,13 +1,13 @@
-import { describe, expect, it, beforeAll, afterEach } from "bun:test";
+import { afterEach, beforeAll, describe, expect, it } from "bun:test";
 import {
-  initMMG3D,
-  getWasmModule,
-  MMG3D,
-  IPARAM,
   DPARAM,
+  IPARAM,
+  MMG3D,
+  type MMG3DModule,
   MMG_RETURN_CODES,
   type MeshHandle,
-  type MMG3DModule,
+  getWasmModule,
+  initMMG3D,
 } from "../src/index";
 
 describe("WASM Module Loading", () => {

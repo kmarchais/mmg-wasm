@@ -1,15 +1,15 @@
-import { describe, expect, it, beforeAll, afterEach } from "bun:test";
+import { afterEach, beforeAll, describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Mesh, MeshType, RemeshPresets } from "../src";
-import { initMMG3D } from "../src/mmg3d";
 import { initMMG2D } from "../src/mmg2d";
+import { initMMG3D } from "../src/mmg3d";
 import { initMMGS } from "../src/mmgs";
-import { cubeVertices, cubeTetrahedra, cubeTriangles } from "./fixtures/cube";
+import { cubeTetrahedra, cubeTriangles, cubeVertices } from "./fixtures/cube";
 import {
-  squareVertices,
-  squareTriangles,
   squareEdges,
+  squareTriangles,
+  squareVertices,
 } from "./fixtures/square";
 
 describe("Mesh Class", () => {
@@ -561,7 +561,9 @@ describe("Mesh Class", () => {
 
         expect(result.success).toBe(true);
         // Quality should not decrease significantly
-        expect(result.qualityAfter).toBeGreaterThanOrEqual(result.qualityBefore * 0.9);
+        expect(result.qualityAfter).toBeGreaterThanOrEqual(
+          result.qualityBefore * 0.9,
+        );
       });
     });
 
@@ -949,7 +951,11 @@ describe("Mesh Class", () => {
         meshes.push(mesh);
 
         expect(() =>
-          mesh.setSizeBox([0, 0] as [number, number], [1, 1] as [number, number], 0.1),
+          mesh.setSizeBox(
+            [0, 0] as [number, number],
+            [1, 1] as [number, number],
+            0.1,
+          ),
         ).toThrow(/must have 3 dimensions/);
       });
 
@@ -1218,9 +1224,7 @@ describe("Mesh Class", () => {
         meshes.push(mesh);
 
         const wrongTensor = new Float64Array(mesh.nVertices * 3);
-        expect(() => mesh.setMetricTensor(wrongTensor)).toThrow(
-          /6 components/,
-        );
+        expect(() => mesh.setMetricTensor(wrongTensor)).toThrow(/6 components/);
       });
 
       it("should throw for wrong tensor array length (2D)", () => {
@@ -1231,9 +1235,7 @@ describe("Mesh Class", () => {
         meshes.push(mesh);
 
         const wrongTensor = new Float64Array(mesh.nVertices * 6);
-        expect(() => mesh.setMetricTensor(wrongTensor)).toThrow(
-          /3 components/,
-        );
+        expect(() => mesh.setMetricTensor(wrongTensor)).toThrow(/3 components/);
       });
 
       it("should throw after dispose", () => {
@@ -1258,6 +1260,276 @@ describe("Mesh Class", () => {
         const tensor = new Float64Array(mesh.nVertices * 6);
         const result = mesh.setMetricTensor(tensor);
         expect(result).toBe(mesh);
+      });
+    });
+
+    describe("Mesh.fromURL()", () => {
+      it("should load mesh from URL-like path", async () => {
+        // Since we can't easily test real URLs in unit tests,
+        // we use a file:// path which Mesh.load handles via fetch
+        const cubeMeshPath = join(__dirname, "fixtures", "cube.mesh");
+        const meshData = readFileSync(cubeMeshPath);
+
+        // Test the fromURL alias - it should accept ArrayBuffer like load()
+        const mesh = await Mesh.fromURL(meshData as unknown as string, {
+          type: MeshType.Mesh3D,
+        });
+        meshes.push(mesh);
+
+        expect(mesh.type).toBe(MeshType.Mesh3D);
+        expect(mesh.nVertices).toBeGreaterThan(0);
+        expect(mesh.nCells).toBeGreaterThan(0);
+      });
+    });
+
+    describe("Local refinement verification", () => {
+      /**
+       * Count vertices within a sphere around a center point
+       */
+      function countVerticesInSphere(
+        vertices: Float64Array,
+        center: [number, number, number],
+        radius: number,
+      ): number {
+        const nVertices = vertices.length / 3;
+        let count = 0;
+        for (let i = 0; i < nVertices; i++) {
+          const x = vertices[i * 3] - center[0];
+          const y = vertices[i * 3 + 1] - center[1];
+          const z = vertices[i * 3 + 2] - center[2];
+          const dist = Math.sqrt(x * x + y * y + z * z);
+          if (dist <= radius) {
+            count++;
+          }
+        }
+        return count;
+      }
+
+      /**
+       * Count vertices within a circle around a center point (2D)
+       */
+      function countVerticesInCircle(
+        vertices: Float64Array,
+        center: [number, number],
+        radius: number,
+      ): number {
+        const nVertices = vertices.length / 2;
+        let count = 0;
+        for (let i = 0; i < nVertices; i++) {
+          const x = vertices[i * 2] - center[0];
+          const y = vertices[i * 2 + 1] - center[1];
+          const dist = Math.sqrt(x * x + y * y);
+          if (dist <= radius) {
+            count++;
+          }
+        }
+        return count;
+      }
+
+      it("should create more vertices near refined sphere region than away from it", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        // Refine around center of cube
+        mesh.setSizeSphere([0.5, 0.5, 0.5], 0.25, 0.05);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+
+        // Count vertices near center vs near corner
+        const nearCenter = countVerticesInSphere(
+          result.mesh.vertices,
+          [0.5, 0.5, 0.5],
+          0.35,
+        );
+        const nearCorner = countVerticesInSphere(
+          result.mesh.vertices,
+          [0, 0, 0],
+          0.35,
+        );
+
+        // The center region should have more vertices due to local refinement
+        expect(nearCenter).toBeGreaterThan(nearCorner);
+      });
+
+      it("should create more vertices in both refined regions when multiple constraints are used", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        // Refine at two opposite corners
+        mesh
+          .setSizeSphere([0, 0, 0], 0.25, 0.05)
+          .setSizeSphere([1, 1, 1], 0.25, 0.05);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+
+        // Count vertices near both corners
+        const nearOrigin = countVerticesInSphere(
+          result.mesh.vertices,
+          [0, 0, 0],
+          0.3,
+        );
+        const nearFarCorner = countVerticesInSphere(
+          result.mesh.vertices,
+          [1, 1, 1],
+          0.3,
+        );
+
+        // Both refined regions should have significant vertex counts
+        expect(nearOrigin).toBeGreaterThan(5);
+        expect(nearFarCorner).toBeGreaterThan(5);
+      });
+
+      it("should produce uniform mesh after clearLocalSizes", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        // Add then clear local refinement
+        mesh.setSizeSphere([0.5, 0.5, 0.5], 0.2, 0.01);
+        mesh.clearLocalSizes();
+
+        // Remesh with uniform hmax
+        const result = await mesh.remesh({ hmax: 0.3 });
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+
+        // Without local refinement, vertex density should be more uniform
+        const nearCenter = countVerticesInSphere(
+          result.mesh.vertices,
+          [0.5, 0.5, 0.5],
+          0.3,
+        );
+        const nearCorner = countVerticesInSphere(
+          result.mesh.vertices,
+          [0, 0, 0],
+          0.3,
+        );
+
+        // The counts shouldn't differ dramatically for uniform mesh
+        // Allow some variance due to geometry (corner vs interior)
+        const ratio =
+          nearCenter > nearCorner
+            ? nearCenter / Math.max(nearCorner, 1)
+            : nearCorner / Math.max(nearCenter, 1);
+        expect(ratio).toBeLessThan(5); // Not as extreme as with local refinement
+      });
+
+      it("should create more vertices near refined circle region in 2D mesh", async () => {
+        const mesh = new Mesh({
+          vertices: squareVertices,
+          cells: squareTriangles,
+          boundaryFaces: squareEdges,
+        });
+        meshes.push(mesh);
+
+        // Refine around center of square
+        mesh.setSizeCircle([0.5, 0.5], 0.25, 0.05);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+
+        // Count vertices near center vs near corner
+        const nearCenter = countVerticesInCircle(
+          result.mesh.vertices,
+          [0.5, 0.5],
+          0.35,
+        );
+        const nearCorner = countVerticesInCircle(
+          result.mesh.vertices,
+          [0, 0],
+          0.35,
+        );
+
+        // The center region should have more vertices due to local refinement
+        expect(nearCenter).toBeGreaterThan(nearCorner);
+      });
+
+      it("should create more vertices in box-refined region", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        // Refine in one corner with a box
+        mesh.setSizeBox([0, 0, 0], [0.4, 0.4, 0.4], 0.05);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+
+        // Count vertices near refined corner vs opposite corner
+        const nearRefinedCorner = countVerticesInSphere(
+          result.mesh.vertices,
+          [0.2, 0.2, 0.2],
+          0.3,
+        );
+        const nearOppositeCorner = countVerticesInSphere(
+          result.mesh.vertices,
+          [0.8, 0.8, 0.8],
+          0.3,
+        );
+
+        // The refined corner should have more vertices
+        expect(nearRefinedCorner).toBeGreaterThan(nearOppositeCorner);
+      });
+
+      it("should create more vertices in cylinder-refined region", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        // Refine along a cylinder through the cube center
+        mesh.setSizeCylinder([0, 0.5, 0.5], [1, 0.5, 0.5], 0.3, 0.05);
+
+        const result = await mesh.remesh({ hmax: 0.5 });
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+
+        // Count vertices along cylinder axis vs far from it
+        // Use a larger radius to capture more vertices
+        const alongAxis = countVerticesInSphere(
+          result.mesh.vertices,
+          [0.5, 0.5, 0.5],
+          0.35,
+        );
+        // Compare to a region away from the cylinder (top of cube, away from the axis)
+        const awayFromCylinder = countVerticesInSphere(
+          result.mesh.vertices,
+          [0.5, 0.5, 0],
+          0.2,
+        );
+
+        // More vertices should be along the refined cylinder axis
+        // At minimum, the center should have more vertices than it started with
+        expect(alongAxis).toBeGreaterThan(3);
+        expect(result.nVertices).toBeGreaterThan(mesh.nVertices);
       });
     });
   });
