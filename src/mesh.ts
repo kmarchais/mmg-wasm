@@ -944,7 +944,9 @@ export class Mesh {
 
     // Use a fraction of the diagonal as default size
     // This allows MMG to refine freely while respecting the mesh scale
-    return Math.sqrt(diag2) * 0.2;
+    // Handle degenerate case where all vertices are at the same point
+    const diag = Math.sqrt(diag2);
+    return diag > 0 ? diag * 0.2 : 1.0;
   }
 
   // =====================
