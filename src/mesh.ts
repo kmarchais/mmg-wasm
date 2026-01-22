@@ -560,24 +560,25 @@ export class Mesh {
    * Create internal MMG handle
    */
   private createHandle(): MeshHandle | MeshHandle2D | MeshHandleS {
-    let handle: MeshHandle | MeshHandle2D | MeshHandleS;
-
     switch (this._type) {
-      case MeshType.Mesh2D:
-        handle = MMG2D.init();
+      case MeshType.Mesh2D: {
+        const handle = MMG2D.init();
         MMG2D.setIParam(handle, IPARAM_2D.verbose, -1);
-        break;
-      case MeshType.Mesh3D:
-        handle = MMG3D.init();
+        return handle;
+      }
+      case MeshType.Mesh3D: {
+        const handle = MMG3D.init();
         MMG3D.setIParam(handle, IPARAM.verbose, -1);
-        break;
-      case MeshType.MeshS:
-        handle = MMGS.init();
+        return handle;
+      }
+      case MeshType.MeshS: {
+        const handle = MMGS.init();
         MMGS.setIParam(handle, IPARAM_S.verbose, -1);
-        break;
+        return handle;
+      }
+      default:
+        throw new Error(`Unknown mesh type: ${this._type}`);
     }
-
-    return handle;
   }
 
   /**
@@ -695,6 +696,8 @@ export class Mesh {
         return MMG3D.getMeshSize(this._handle as MeshHandle);
       case MeshType.MeshS:
         return MMGS.getMeshSize(this._handle as MeshHandleS);
+      default:
+        throw new Error(`Unknown mesh type: ${this._type}`);
     }
   }
 
@@ -709,6 +712,8 @@ export class Mesh {
         return getFS();
       case MeshType.MeshS:
         return getFSS();
+      default:
+        throw new Error(`Unknown mesh type: ${type}`);
     }
   }
 }
