@@ -124,7 +124,8 @@ function trackAllocation(
   tracker.totalAllocated += byteLength;
 
   if (tracker.config.verbose) {
-    const typeName = type === "float64" ? "Float64" : type === "int32" ? "Int32" : "Uint32";
+    const typeName =
+      type === "float64" ? "Float64" : type === "int32" ? "Int32" : "Uint32";
     console.log(
       `[mmg-wasm] Allocated ${byteLength} bytes (${typeName}[${elementCount}]), ` +
         `total: ${tracker.totalAllocated} bytes`,
@@ -467,10 +468,16 @@ export function configureMemory(
   // Validate and clamp threshold values to [0, 1]
   const validatedConfig: Partial<MemoryConfig> = { ...config };
   if (validatedConfig.warnThreshold !== undefined) {
-    validatedConfig.warnThreshold = Math.max(0, Math.min(1, validatedConfig.warnThreshold));
+    validatedConfig.warnThreshold = Math.max(
+      0,
+      Math.min(1, validatedConfig.warnThreshold),
+    );
   }
   if (validatedConfig.errorThreshold !== undefined) {
-    validatedConfig.errorThreshold = Math.max(0, Math.min(1, validatedConfig.errorThreshold));
+    validatedConfig.errorThreshold = Math.max(
+      0,
+      Math.min(1, validatedConfig.errorThreshold),
+    );
   }
 
   tracker.config = { ...tracker.config, ...validatedConfig };
