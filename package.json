@@ -21,10 +21,14 @@
     "lint": "biome lint src",
     "format": "biome format src --write",
     "check": "biome check src",
-    "clean": "rm -rf build dist",
+    "clean": "rm -rf build dist web/dist",
     "toolchain:check": "./scripts/check-toolchain.sh",
     "toolchain:setup": "./scripts/setup-emsdk.sh",
-    "example": "cp build/dist/mmg.js build/dist/mmg.wasm examples/ && bunx serve examples -p 3000"
+    "example": "cp build/dist/mmg.js build/dist/mmg.wasm examples/ && bunx serve examples -p 3000",
+    "web:install": "cd web && npm install",
+    "web:dev": "cp build/dist/mmg.js build/dist/mmg.wasm web/ && cd web && npm run dev",
+    "web:build": "cp build/dist/mmg.js build/dist/mmg.wasm web/ && cd web && npm run build",
+    "web:preview": "cd web && npm run preview"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
