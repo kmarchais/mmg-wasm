@@ -541,6 +541,179 @@ int mmg2d_set_dparameter(int handle, int dparam, double val) {
 }
 
 /**
+ * Set the solution size (allocate memory for solution data).
+ * @param typEntity - Type of entity (1 = vertex)
+ * @param np - Number of entities
+ * @param typSol - Type of solution (1 = scalar, 2 = vector, 3 = tensor)
+ * Returns 1 on success, 0 on failure.
+ */
+EMSCRIPTEN_KEEPALIVE
+int mmg2d_set_sol_size(int handle, int typEntity, int np, int typSol) {
+    if (!validate_handle_2d(handle)) {
+        return 0;
+    }
+
+    return MMG2D_Set_solSize(
+        g_handles_2d[handle].mesh,
+        g_handles_2d[handle].sol,
+        typEntity,
+        (MMG5_int)np,
+        typSol
+    );
+}
+
+/**
+ * Get the solution size information.
+ * Output parameters are pointers allocated by the caller.
+ * Returns 1 on success, 0 on failure.
+ */
+EMSCRIPTEN_KEEPALIVE
+int mmg2d_get_sol_size(int handle, int* typEntity, int* np, int* typSol) {
+    if (!validate_handle_2d(handle)) {
+        return 0;
+    }
+
+    MMG5_int _np;
+    int _typEntity, _typSol;
+
+    int result = MMG2D_Get_solSize(
+        g_handles_2d[handle].mesh,
+        g_handles_2d[handle].sol,
+        &_typEntity,
+        &_np,
+        &_typSol
+    );
+
+    if (result == 1) {
+        if (typEntity) *typEntity = _typEntity;
+        if (np) *np = (int)_np;
+        if (typSol) *typSol = _typSol;
+    }
+
+    return result;
+}
+
+/**
+ * Set all scalar solution values at once (bulk operation).
+ * values: array of np doubles (one per vertex)
+ * Returns 1 on success, 0 on failure.
+ */
+EMSCRIPTEN_KEEPALIVE
+int mmg2d_set_scalar_sols(int handle, double* values) {
+    if (!validate_handle_2d(handle)) {
+        return 0;
+    }
+
+    return MMG2D_Set_scalarSols(g_handles_2d[handle].sol, values);
+}
+
+/**
+ * Get all scalar solution values.
+ * Allocates and returns a pointer to the values array.
+ * out_count receives the number of values.
+ * Caller must free the returned pointer using mmg2d_free_array.
+ * Returns NULL on failure.
+ */
+EMSCRIPTEN_KEEPALIVE
+double* mmg2d_get_scalar_sols(int handle, int* out_count) {
+    if (!validate_handle_2d(handle)) {
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    /* Get solution size to determine number of entities */
+    int typEntity, typSol;
+    MMG5_int np;
+    if (MMG2D_Get_solSize(g_handles_2d[handle].mesh, g_handles_2d[handle].sol,
+                          &typEntity, &np, &typSol) != 1) {
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    if (np == 0 || typSol != 1) { /* 1 = MMG5_Scalar */
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    /* Allocate output array */
+    double* values = (double*)malloc(np * sizeof(double));
+    if (!values) {
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    int result = MMG2D_Get_scalarSols(g_handles_2d[handle].sol, values);
+    if (result != 1) {
+        free(values);
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    if (out_count) *out_count = (int)np;
+    return values;
+}
+
+/**
+ * Set all tensor solution values at once (bulk operation).
+ * values: array of np*3 doubles (3 components per vertex: m11, m12, m22)
+ * Returns 1 on success, 0 on failure.
+ */
+EMSCRIPTEN_KEEPALIVE
+int mmg2d_set_tensor_sols(int handle, double* values) {
+    if (!validate_handle_2d(handle)) {
+        return 0;
+    }
+
+    return MMG2D_Set_tensorSols(g_handles_2d[handle].sol, values);
+}
+
+/**
+ * Get all tensor solution values.
+ * Allocates and returns a pointer to the values array.
+ * out_count receives the number of vertices (array size is out_count * 3).
+ * Caller must free the returned pointer using mmg2d_free_array.
+ * Returns NULL on failure.
+ */
+EMSCRIPTEN_KEEPALIVE
+double* mmg2d_get_tensor_sols(int handle, int* out_count) {
+    if (!validate_handle_2d(handle)) {
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    /* Get solution size to determine number of entities */
+    int typEntity, typSol;
+    MMG5_int np;
+    if (MMG2D_Get_solSize(g_handles_2d[handle].mesh, g_handles_2d[handle].sol,
+                          &typEntity, &np, &typSol) != 1) {
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    if (np == 0 || typSol != 3) { /* 3 = MMG5_Tensor */
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    /* Allocate output array: 3 components per vertex for 2D tensor */
+    double* values = (double*)malloc(np * 3 * sizeof(double));
+    if (!values) {
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    int result = MMG2D_Get_tensorSols(g_handles_2d[handle].sol, values);
+    if (result != 1) {
+        free(values);
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    if (out_count) *out_count = (int)np;
+    return values;
+}
+
+/**
  * Run the MMG2D remeshing algorithm.
  * Returns MMG5_SUCCESS (0) on success, or an error code.
  */

@@ -4,6 +4,8 @@ import {
   IPARAM_2D,
   MMG2D,
   MMG_RETURN_CODES_2D,
+  SOL_ENTITY_2D,
+  SOL_TYPE_2D,
   type MeshHandle2D,
   initMMG2D,
 } from "../src/mmg2d";
@@ -440,6 +442,136 @@ describe("MMG2D", () => {
 
       expect(size1.nVertices).toBe(4);
       expect(size2.nVertices).toBe(6);
+    });
+  });
+
+  describe("Solution/Metric Fields", () => {
+    it("should set and get solution size for scalar metric", () => {
+      const handle = MMG2D.init();
+      handles.push(handle);
+
+      // Create a simple mesh first
+      MMG2D.setMeshSize(handle, 4, 2, 0, 4);
+
+      // Set solution size for scalar metric at vertices
+      MMG2D.setSolSize(handle, SOL_ENTITY_2D.VERTEX, 4, SOL_TYPE_2D.SCALAR);
+
+      const solInfo = MMG2D.getSolSize(handle);
+      expect(solInfo.typEntity).toBe(SOL_ENTITY_2D.VERTEX);
+      expect(solInfo.nEntities).toBe(4);
+      expect(solInfo.typSol).toBe(SOL_TYPE_2D.SCALAR);
+    });
+
+    it("should set and get scalar solution values", () => {
+      const handle = MMG2D.init();
+      handles.push(handle);
+
+      // Create a simple square mesh
+      MMG2D.setMeshSize(handle, 4, 2, 0, 4);
+
+      // Set vertices (unit square)
+      const vertices = new Float64Array([
+        0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+      ]);
+      MMG2D.setVertices(handle, vertices);
+
+      // Set solution size for scalar metric
+      MMG2D.setSolSize(handle, SOL_ENTITY_2D.VERTEX, 4, SOL_TYPE_2D.SCALAR);
+
+      // Set scalar values (desired edge length at each vertex)
+      const metric = new Float64Array([0.1, 0.2, 0.15, 0.25]);
+      MMG2D.setScalarSols(handle, metric);
+
+      // Get back the values
+      const result = MMG2D.getScalarSols(handle);
+      expect(result.length).toBe(4);
+      for (let i = 0; i < 4; i++) {
+        expect(result[i]).toBeCloseTo(metric[i]);
+      }
+    });
+
+    it("should set and get tensor solution values", () => {
+      const handle = MMG2D.init();
+      handles.push(handle);
+
+      // Create a simple square mesh
+      MMG2D.setMeshSize(handle, 4, 2, 0, 4);
+
+      // Set vertices
+      const vertices = new Float64Array([
+        0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+      ]);
+      MMG2D.setVertices(handle, vertices);
+
+      // Set solution size for tensor metric (3 components per vertex in 2D)
+      MMG2D.setSolSize(handle, SOL_ENTITY_2D.VERTEX, 4, SOL_TYPE_2D.TENSOR);
+
+      // Set tensor values: m11, m12, m22 per vertex
+      const tensorMetric = new Float64Array([
+        1.0, 0.0, 1.0, // vertex 1
+        2.0, 0.0, 2.0, // vertex 2
+        1.5, 0.0, 1.5, // vertex 3
+        1.0, 0.0, 1.0, // vertex 4
+      ]);
+      MMG2D.setTensorSols(handle, tensorMetric);
+
+      // Get back the values
+      const result = MMG2D.getTensorSols(handle);
+      expect(result.length).toBe(4 * 3); // 4 vertices * 3 components
+      for (let i = 0; i < tensorMetric.length; i++) {
+        expect(result[i]).toBeCloseTo(tensorMetric[i]);
+      }
+    });
+
+    it("should use scalar metric for mesh adaptation", () => {
+      const handle = MMG2D.init();
+      handles.push(handle);
+
+      // Create a simple square mesh with 2 triangles
+      MMG2D.setMeshSize(handle, 4, 2, 0, 4);
+
+      // Set vertices (unit square)
+      const vertices = new Float64Array([
+        0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+      ]);
+      MMG2D.setVertices(handle, vertices);
+
+      // Set triangles
+      const tria = new Int32Array([
+        1, 2, 3, // lower-right
+        1, 3, 4, // upper-left
+      ]);
+      MMG2D.setTriangles(handle, tria);
+
+      // Set boundary edges
+      const edges = new Int32Array([
+        1, 2, // bottom
+        2, 3, // right
+        3, 4, // top
+        4, 1, // left
+      ]);
+      MMG2D.setEdges(handle, edges);
+
+      // Set solution size for scalar metric
+      MMG2D.setSolSize(handle, SOL_ENTITY_2D.VERTEX, 4, SOL_TYPE_2D.SCALAR);
+
+      // Set small edge length to trigger refinement
+      const metric = new Float64Array([0.2, 0.2, 0.2, 0.2]);
+      MMG2D.setScalarSols(handle, metric);
+
+      // Set parameters
+      MMG2D.setIParam(handle, IPARAM_2D.verbose, -1); // Silent
+
+      // Run remeshing
+      const result = MMG2D.mmg2dlib(handle);
+
+      // Check result
+      expect(result).toBe(MMG_RETURN_CODES_2D.SUCCESS);
+
+      // Verify mesh was refined
+      const newSize = MMG2D.getMeshSize(handle);
+      expect(newSize.nVertices).toBeGreaterThan(4);
+      expect(newSize.nTriangles).toBeGreaterThan(2);
     });
   });
 });

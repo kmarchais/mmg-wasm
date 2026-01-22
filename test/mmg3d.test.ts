@@ -5,6 +5,8 @@ import {
 	IPARAM,
 	DPARAM,
 	MMG_RETURN_CODES,
+	SOL_ENTITY,
+	SOL_TYPE,
 	type MeshHandle,
 } from "../src/mmg3d";
 
@@ -387,6 +389,134 @@ describe("MMG3D", () => {
 
 			expect(size1.nVertices).toBe(4);
 			expect(size2.nVertices).toBe(8);
+		});
+	});
+
+	describe("Solution/Metric Fields", () => {
+		it("should set and get solution size for scalar metric", () => {
+			const handle = MMG3D.init();
+			handles.push(handle);
+
+			// Create a simple mesh first
+			MMG3D.setMeshSize(handle, 4, 1, 0, 4, 0, 0);
+
+			// Set solution size for scalar metric at vertices
+			MMG3D.setSolSize(handle, SOL_ENTITY.VERTEX, 4, SOL_TYPE.SCALAR);
+
+			const solInfo = MMG3D.getSolSize(handle);
+			expect(solInfo.typEntity).toBe(SOL_ENTITY.VERTEX);
+			expect(solInfo.nEntities).toBe(4);
+			expect(solInfo.typSol).toBe(SOL_TYPE.SCALAR);
+		});
+
+		it("should set and get scalar solution values", () => {
+			const handle = MMG3D.init();
+			handles.push(handle);
+
+			// Create a simple mesh
+			MMG3D.setMeshSize(handle, 4, 1, 0, 4, 0, 0);
+
+			// Set vertices
+			const vertices = new Float64Array([
+				0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.5, 1.0, 0.0, 0.5, 0.5, 1.0,
+			]);
+			MMG3D.setVertices(handle, vertices);
+
+			// Set solution size for scalar metric
+			MMG3D.setSolSize(handle, SOL_ENTITY.VERTEX, 4, SOL_TYPE.SCALAR);
+
+			// Set scalar values (desired edge length at each vertex)
+			const metric = new Float64Array([0.1, 0.2, 0.15, 0.25]);
+			MMG3D.setScalarSols(handle, metric);
+
+			// Get back the values
+			const result = MMG3D.getScalarSols(handle);
+			expect(result.length).toBe(4);
+			for (let i = 0; i < 4; i++) {
+				expect(result[i]).toBeCloseTo(metric[i]);
+			}
+		});
+
+		it("should set and get tensor solution values", () => {
+			const handle = MMG3D.init();
+			handles.push(handle);
+
+			// Create a simple mesh
+			MMG3D.setMeshSize(handle, 4, 1, 0, 4, 0, 0);
+
+			// Set vertices
+			const vertices = new Float64Array([
+				0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.5, 1.0, 0.0, 0.5, 0.5, 1.0,
+			]);
+			MMG3D.setVertices(handle, vertices);
+
+			// Set solution size for tensor metric (6 components per vertex in 3D)
+			MMG3D.setSolSize(handle, SOL_ENTITY.VERTEX, 4, SOL_TYPE.TENSOR);
+
+			// Set tensor values: m11, m12, m13, m22, m23, m33 per vertex
+			// Using identity-like metric for simplicity
+			const tensorMetric = new Float64Array([
+				1.0, 0.0, 0.0, 1.0, 0.0, 1.0, // vertex 1
+				2.0, 0.0, 0.0, 2.0, 0.0, 2.0, // vertex 2
+				1.5, 0.0, 0.0, 1.5, 0.0, 1.5, // vertex 3
+				1.0, 0.0, 0.0, 1.0, 0.0, 1.0, // vertex 4
+			]);
+			MMG3D.setTensorSols(handle, tensorMetric);
+
+			// Get back the values
+			const result = MMG3D.getTensorSols(handle);
+			expect(result.length).toBe(4 * 6); // 4 vertices * 6 components
+			for (let i = 0; i < tensorMetric.length; i++) {
+				expect(result[i]).toBeCloseTo(tensorMetric[i]);
+			}
+		});
+
+		it("should use scalar metric for mesh adaptation", () => {
+			const handle = MMG3D.init();
+			handles.push(handle);
+
+			// Create a simple tetrahedron mesh
+			MMG3D.setMeshSize(handle, 4, 1, 0, 4, 0, 0);
+
+			// Set vertices (a unit tetrahedron)
+			const vertices = new Float64Array([
+				0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.5, 0.866, 0.0, 0.5, 0.289, 0.816,
+			]);
+			MMG3D.setVertices(handle, vertices);
+
+			// Set tetrahedron
+			const tetra = new Int32Array([1, 2, 3, 4]);
+			MMG3D.setTetrahedra(handle, tetra);
+
+			// Set boundary triangles
+			const tria = new Int32Array([
+				1, 3, 2, // bottom face
+				1, 2, 4, // front face
+				2, 3, 4, // right face
+				3, 1, 4, // left face
+			]);
+			MMG3D.setTriangles(handle, tria);
+
+			// Set solution size for scalar metric
+			MMG3D.setSolSize(handle, SOL_ENTITY.VERTEX, 4, SOL_TYPE.SCALAR);
+
+			// Set small edge length to trigger refinement
+			const metric = new Float64Array([0.2, 0.2, 0.2, 0.2]);
+			MMG3D.setScalarSols(handle, metric);
+
+			// Set parameters
+			MMG3D.setIParam(handle, IPARAM.verbose, -1); // Silent
+
+			// Run remeshing
+			const result = MMG3D.mmg3dlib(handle);
+
+			// Check result
+			expect(result).toBe(MMG_RETURN_CODES.SUCCESS);
+
+			// Verify mesh was refined
+			const newSize = MMG3D.getMeshSize(handle);
+			expect(newSize.nVertices).toBeGreaterThan(4);
+			expect(newSize.nTetrahedra).toBeGreaterThan(1);
 		});
 	});
 });

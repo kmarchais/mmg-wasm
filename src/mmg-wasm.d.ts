@@ -117,6 +117,22 @@ declare module "*/mmg.js" {
     _mmg3d_get_triangles(handle: number, outCountPtr: number): number;
     _mmg3d_set_iparameter(handle: number, iparam: number, val: number): number;
     _mmg3d_set_dparameter(handle: number, dparam: number, val: number): number;
+    _mmg3d_set_sol_size(
+      handle: number,
+      typEntity: number,
+      np: number,
+      typSol: number,
+    ): number;
+    _mmg3d_get_sol_size(
+      handle: number,
+      typEntityPtr: number,
+      npPtr: number,
+      typSolPtr: number,
+    ): number;
+    _mmg3d_set_scalar_sols(handle: number, valuesPtr: number): number;
+    _mmg3d_get_scalar_sols(handle: number, outCountPtr: number): number;
+    _mmg3d_set_tensor_sols(handle: number, valuesPtr: number): number;
+    _mmg3d_get_tensor_sols(handle: number, outCountPtr: number): number;
     _mmg3d_remesh(handle: number): number;
     _mmg3d_free_array(ptr: number): void;
     _mmg3d_load_mesh(handle: number, filenamePtr: number): number;
@@ -143,6 +159,22 @@ declare module "*/mmg.js" {
       nquadPtr: number,
       naPtr: number,
     ): number;
+    _mmg2d_set_sol_size(
+      handle: number,
+      typEntity: number,
+      np: number,
+      typSol: number,
+    ): number;
+    _mmg2d_get_sol_size(
+      handle: number,
+      typEntityPtr: number,
+      npPtr: number,
+      typSolPtr: number,
+    ): number;
+    _mmg2d_set_scalar_sols(handle: number, valuesPtr: number): number;
+    _mmg2d_get_scalar_sols(handle: number, outCountPtr: number): number;
+    _mmg2d_set_tensor_sols(handle: number, valuesPtr: number): number;
+    _mmg2d_get_tensor_sols(handle: number, outCountPtr: number): number;
     _mmg2d_load_mesh(handle: number, filenamePtr: number): number;
     _mmg2d_save_mesh(handle: number, filenamePtr: number): number;
     _mmg2d_load_sol(handle: number, filenamePtr: number): number;
@@ -165,6 +197,22 @@ declare module "*/mmg.js" {
       ntPtr: number,
       naPtr: number,
     ): number;
+    _mmgs_set_sol_size(
+      handle: number,
+      typEntity: number,
+      np: number,
+      typSol: number,
+    ): number;
+    _mmgs_get_sol_size(
+      handle: number,
+      typEntityPtr: number,
+      npPtr: number,
+      typSolPtr: number,
+    ): number;
+    _mmgs_set_scalar_sols(handle: number, valuesPtr: number): number;
+    _mmgs_get_scalar_sols(handle: number, outCountPtr: number): number;
+    _mmgs_set_tensor_sols(handle: number, valuesPtr: number): number;
+    _mmgs_get_tensor_sols(handle: number, outCountPtr: number): number;
     _mmgs_load_mesh(handle: number, filenamePtr: number): number;
     _mmgs_save_mesh(handle: number, filenamePtr: number): number;
     _mmgs_load_sol(handle: number, filenamePtr: number): number;
