@@ -73,6 +73,9 @@ export {
   applyOptions,
 } from "./options";
 
+// Export RemeshResult
+export type { RemeshResult } from "./result";
+
 // Export memory utilities
 export {
   toWasmFloat64,

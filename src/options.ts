@@ -5,10 +5,10 @@
  * with sensible defaults and presets for common use cases.
  */
 
-import { DPARAM, IPARAM, MMG3D, type MeshHandle } from "./mmg3d";
-import { DPARAM_2D, IPARAM_2D, MMG2D, type MeshHandle2D } from "./mmg2d";
-import { DPARAM_S, IPARAM_S, MMGS, type MeshHandleS } from "./mmgs";
 import { MeshType } from "./mesh";
+import { DPARAM_2D, IPARAM_2D, MMG2D, type MeshHandle2D } from "./mmg2d";
+import { DPARAM, IPARAM, MMG3D, type MeshHandle } from "./mmg3d";
+import { DPARAM_S, IPARAM_S, MMGS, type MeshHandleS } from "./mmgs";
 
 /**
  * Options for controlling mesh remeshing behavior
