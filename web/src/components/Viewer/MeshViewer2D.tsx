@@ -1,16 +1,45 @@
 import { useMeshStore } from "@/stores/meshStore";
-import type { MeshData } from "@/types/mesh";
+import { usePaintStore } from "@/stores/paintStore";
+import type { MeshData, MeshType } from "@/types/mesh";
 import { getColor } from "@/utils/colorMapping";
 import { getMetricRange } from "@/utils/meshQuality";
-import { useEffect, useMemo, useRef } from "react";
+import {
+  computeMeshDiagonal,
+  initializeSizeField,
+  paintSizeField,
+} from "@/utils/paintUtils";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface MeshViewer2DProps {
   mesh: MeshData | null;
+  meshType: MeshType;
 }
 
-export function MeshViewer2D({ mesh }: MeshViewer2DProps) {
+export function MeshViewer2D({ mesh, meshType }: MeshViewer2DProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { viewerOptions, theme } = useMeshStore();
+  const { viewerOptions, theme, meshData } = useMeshStore();
+  const {
+    paintModeEnabled,
+    brushSettings,
+    sizeFields,
+    setSizeField,
+    showSizeField,
+    isPainting,
+    setIsPainting,
+  } = usePaintStore();
+
+  // Store transformation for coordinate mapping
+  const [transform, setTransform] = useState<{
+    scale: number;
+    offsetX: number;
+    offsetY: number;
+    height: number;
+  } | null>(null);
+
+  // Brush position in mesh coordinates
+  const [brushPos, setBrushPos] = useState<{ x: number; y: number } | null>(
+    null,
+  );
 
   // Use stored quality from mesh data
   const qualityData = useMemo(() => {
@@ -23,6 +52,130 @@ export function MeshViewer2D({ mesh }: MeshViewer2DProps) {
     const range = getMetricRange(mesh.quality);
     return { quality: mesh.quality, ...range };
   }, [mesh, viewerOptions.qualityMetric]);
+
+  // Compute size field color data
+  const sizeFieldData = useMemo(() => {
+    const sizeField = sizeFields[meshType];
+    if (!sizeField || sizeField.length === 0 || !showSizeField) return null;
+
+    let minSize = Number.POSITIVE_INFINITY;
+    let maxSize = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i < sizeField.length; i++) {
+      const size = sizeField[i] ?? 0;
+      minSize = Math.min(minSize, size);
+      maxSize = Math.max(maxSize, size);
+    }
+
+    return { sizeField, min: minSize, max: maxSize };
+  }, [sizeFields, meshType, showSizeField]);
+
+  // Mesh diagonal for brush calculations
+  const meshDiagonal = useMemo(
+    () => (mesh ? computeMeshDiagonal(mesh, true) : 1),
+    [mesh],
+  );
+  const meshScale = meshData[meshType].scale;
+
+  // Transform screen coordinates to mesh coordinates
+  const screenToMesh = useCallback(
+    (screenX: number, screenY: number): { x: number; y: number } | null => {
+      if (!transform || !canvasRef.current) return null;
+
+      const rect = canvasRef.current.getBoundingClientRect();
+      const canvasX = screenX - rect.left;
+      const canvasY = screenY - rect.top;
+
+      // Inverse transform
+      const meshX = (canvasX - transform.offsetX) / transform.scale;
+      const meshY =
+        (transform.height - canvasY - transform.offsetY) / transform.scale;
+
+      return { x: meshX, y: meshY };
+    },
+    [transform],
+  );
+
+  // Paint at a point
+  const doPaint = useCallback(
+    (meshCoords: { x: number; y: number }) => {
+      if (!mesh) return;
+
+      // Initialize size field if needed
+      let currentField = sizeFields[meshType];
+      if (!currentField) {
+        currentField = initializeSizeField(mesh, true, meshScale * 0.1);
+      }
+
+      // Paint
+      const newField = paintSizeField(
+        currentField,
+        mesh,
+        true,
+        meshCoords,
+        brushSettings,
+        meshDiagonal,
+      );
+
+      setSizeField(meshType, newField);
+    },
+    [mesh, meshType, meshDiagonal, meshScale, brushSettings, sizeFields, setSizeField],
+  );
+
+  // Handle pointer events
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !paintModeEnabled) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.button !== 0) return; // Left click only
+      event.preventDefault();
+      setIsPainting(true);
+
+      const meshCoords = screenToMesh(event.clientX, event.clientY);
+      if (meshCoords) {
+        doPaint(meshCoords);
+      }
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const meshCoords = screenToMesh(event.clientX, event.clientY);
+      setBrushPos(meshCoords);
+
+      // Paint if dragging
+      if (isPainting && meshCoords) {
+        doPaint(meshCoords);
+      }
+    };
+
+    const handlePointerUp = () => {
+      setIsPainting(false);
+    };
+
+    const handlePointerLeave = () => {
+      setBrushPos(null);
+    };
+
+    canvas.addEventListener("pointerdown", handlePointerDown);
+    canvas.addEventListener("pointermove", handlePointerMove);
+    canvas.addEventListener("pointerup", handlePointerUp);
+    canvas.addEventListener("pointerleave", handlePointerLeave);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      canvas.removeEventListener("pointerdown", handlePointerDown);
+      canvas.removeEventListener("pointermove", handlePointerMove);
+      canvas.removeEventListener("pointerup", handlePointerUp);
+      canvas.removeEventListener("pointerleave", handlePointerLeave);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [paintModeEnabled, isPainting, screenToMesh, doPaint, setIsPainting]);
+
+  // Clear brush when paint mode disabled
+  useEffect(() => {
+    if (!paintModeEnabled) {
+      setBrushPos(null);
+    }
+  }, [paintModeEnabled]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -69,6 +222,9 @@ export function MeshViewer2D({ mesh }: MeshViewer2DProps) {
     const offsetY =
       padding + (height - 2 * padding - meshHeight * scale) / 2 - minY * scale;
 
+    // Store transform for painting
+    setTransform({ scale, offsetX, offsetY, height });
+
     const transformX = (x: number) => offsetX + x * scale;
     const transformY = (y: number) => height - (offsetY + y * scale);
 
@@ -80,8 +236,52 @@ export function MeshViewer2D({ mesh }: MeshViewer2DProps) {
     if (triangles) {
       const nTris = triangles.length / 3;
 
-      // Draw filled triangles if quality metric is selected
-      if (qualityData && viewerOptions.qualityMetric) {
+      // Draw filled triangles based on size field or quality metric
+      if (sizeFieldData && showSizeField) {
+        // Size field visualization
+        const { sizeField, min, max } = sizeFieldData;
+        const range = max - min || 1;
+
+        for (let i = 0; i < nTris; i++) {
+          const v0Idx = triangles[i * 3]! - 1;
+          const v1Idx = triangles[i * 3 + 1]! - 1;
+          const v2Idx = triangles[i * 3 + 2]! - 1;
+
+          // Average size at triangle corners
+          const s0 = sizeField[v0Idx] ?? 0;
+          const s1 = sizeField[v1Idx] ?? 0;
+          const s2 = sizeField[v2Idx] ?? 0;
+          const avgSize = (s0 + s1 + s2) / 3;
+          const t = (avgSize - min) / range;
+
+          // Blue (fine) to Red (coarse) color mapping
+          let r: number, g: number, b: number;
+          if (t < 0.5) {
+            const s = t * 2;
+            r = s;
+            g = s;
+            b = 1;
+          } else {
+            const s = (t - 0.5) * 2;
+            r = 1;
+            g = 1 - s;
+            b = 1 - s;
+          }
+
+          const v0 = v0Idx * 2;
+          const v1 = v1Idx * 2;
+          const v2 = v2Idx * 2;
+
+          ctx.fillStyle = `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`;
+          ctx.beginPath();
+          ctx.moveTo(transformX(vertices[v0]!), transformY(vertices[v0 + 1]!));
+          ctx.lineTo(transformX(vertices[v1]!), transformY(vertices[v1 + 1]!));
+          ctx.lineTo(transformX(vertices[v2]!), transformY(vertices[v2 + 1]!));
+          ctx.closePath();
+          ctx.fill();
+        }
+      } else if (qualityData && viewerOptions.qualityMetric) {
+        // Quality metric visualization
         for (let i = 0; i < nTris; i++) {
           const v0 = (triangles[i * 3]! - 1) * 2;
           const v1 = (triangles[i * 3 + 1]! - 1) * 2;
@@ -140,10 +340,50 @@ export function MeshViewer2D({ mesh }: MeshViewer2DProps) {
         ctx.fill();
       }
     }
-  }, [mesh, viewerOptions, qualityData, theme]);
+
+    // Draw brush cursor
+    if (paintModeEnabled && brushPos) {
+      const brushRadius = brushSettings.radius * meshDiagonal;
+      const screenRadius = brushRadius * scale;
+
+      ctx.strokeStyle = "#ff6600";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(
+        transformX(brushPos.x),
+        transformY(brushPos.y),
+        screenRadius,
+        0,
+        Math.PI * 2,
+      );
+      ctx.stroke();
+
+      // Draw crosshair
+      ctx.beginPath();
+      ctx.moveTo(transformX(brushPos.x) - 5, transformY(brushPos.y));
+      ctx.lineTo(transformX(brushPos.x) + 5, transformY(brushPos.y));
+      ctx.moveTo(transformX(brushPos.x), transformY(brushPos.y) - 5);
+      ctx.lineTo(transformX(brushPos.x), transformY(brushPos.y) + 5);
+      ctx.stroke();
+    }
+  }, [
+    mesh,
+    viewerOptions,
+    qualityData,
+    theme,
+    sizeFieldData,
+    showSizeField,
+    paintModeEnabled,
+    brushPos,
+    brushSettings.radius,
+    meshDiagonal,
+  ]);
 
   return (
-    <div className="viewer-container h-full">
+    <div
+      className="viewer-container h-full"
+      style={{ cursor: paintModeEnabled ? "crosshair" : "default" }}
+    >
       {mesh ? (
         <canvas
           ref={canvasRef}

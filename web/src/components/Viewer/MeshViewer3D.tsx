@@ -1,6 +1,7 @@
 import { CanvasErrorBoundary } from "@/components/ErrorBoundary";
 import { useMeshStore } from "@/stores/meshStore";
-import type { MeshData } from "@/types/mesh";
+import { usePaintStore } from "@/stores/paintStore";
+import type { MeshData, MeshType } from "@/types/mesh";
 import { getColorArray } from "@/utils/colorMapping";
 import {
   buildClippedTetrahedraGeometry,
@@ -9,35 +10,97 @@ import {
   createCenteredPositions,
 } from "@/utils/geometryBuilder";
 import {
+  computeMeshDiagonal,
+  createBrushCircle,
+  initializeSizeField,
+  paintSizeField,
+  sizeFieldToColors,
+} from "@/utils/paintUtils";
+import {
   Environment,
   GizmoHelper,
   GizmoViewport,
   TrackballControls,
 } from "@react-three/drei";
-import { Canvas } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { Canvas, useThree } from "@react-three/fiber";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
 interface MeshViewer3DProps {
   mesh: MeshData | null;
+  meshType: MeshType;
+}
+
+interface BrushCursorProps {
+  position: THREE.Vector3 | null;
+  normal: THREE.Vector3 | null;
+  radius: number;
+  visible: boolean;
+}
+
+function BrushCursor({ position, normal, radius, visible }: BrushCursorProps) {
+  const geometry = useMemo(() => {
+    if (!position || !normal) return null;
+    return createBrushCircle(position, normal, radius);
+  }, [position, normal, radius]);
+
+  if (!visible || !geometry) return null;
+
+  return (
+    <lineLoop geometry={geometry}>
+      <lineBasicMaterial color="#ff6600" linewidth={2} depthTest={false} />
+    </lineLoop>
+  );
 }
 
 function MeshGeometry({
   mesh,
+  meshType,
   boundingBox,
 }: {
   mesh: MeshData;
+  meshType: MeshType;
   boundingBox: {
     min: THREE.Vector3;
     max: THREE.Vector3;
     center: THREE.Vector3;
   };
 }) {
-  const { viewerOptions, theme, clippingEnabled, clippingPosition } =
+  const { viewerOptions, theme, clippingEnabled, clippingPosition, meshData } =
     useMeshStore();
+  const {
+    paintModeEnabled,
+    brushSettings,
+    sizeFields,
+    setSizeField,
+    showSizeField,
+    isPainting,
+    setIsPainting,
+  } = usePaintStore();
+
   const meshRef = useRef<THREE.Mesh>(null);
   const wireframeRef = useRef<THREE.LineSegments>(null);
   const pointsRef = useRef<THREE.Points>(null);
+
+  // Brush cursor state
+  const [brushPosition, setBrushPosition] = useState<THREE.Vector3 | null>(
+    null,
+  );
+  const [brushNormal, setBrushNormal] = useState<THREE.Vector3 | null>(null);
+
+  // Three.js hooks
+  const { camera, gl } = useThree();
+
+  // Raycaster for mesh intersection
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+
+  // Mesh diagonal for brush calculations
+  const meshDiagonal = useMemo(
+    () => computeMeshDiagonal(mesh, false),
+    [mesh],
+  );
+  const meshScale = meshData[meshType].scale;
+  const brushRadius = brushSettings.radius * meshDiagonal;
 
   // Check if we have tetrahedra and should show them when clipping
   const hasTetrahedra = mesh.tetrahedra && mesh.tetrahedra.length > 0;
@@ -88,19 +151,28 @@ function MeshGeometry({
       viewerOptions.colormap,
     ]);
 
-  // Compute quality colors for surface triangles
-  // For MMGS meshes, use stored triangle quality
-  // For MMG3D meshes without tetrahedra, use stored quality if available
+  // Get current size field
+  const sizeField = sizeFields[meshType];
+
+  // Compute colors based on quality metric or size field
   const colors = useMemo(() => {
     if (showTetrahedraFaces) return null;
-    if (!viewerOptions.qualityMetric || !mesh.triangles) return null;
+    if (!mesh.triangles) return null;
+
+    const nTris = mesh.triangles.length / 3;
+
+    // Priority: size field visualization > quality metric
+    if (showSizeField && sizeField && sizeField.length > 0) {
+      return sizeFieldToColors(sizeField, nTris, mesh.triangles);
+    }
+
+    if (!viewerOptions.qualityMetric) return null;
 
     // Only show quality colors for surface meshes (MMGS) where quality is per-triangle
     // For MMG3D, quality is per-tetrahedra so we can't color surface triangles
     if (!mesh.quality || mesh.quality.length === 0) return null;
 
     // Check if quality count matches triangle count (MMGS case)
-    const nTris = mesh.triangles.length / 3;
     if (mesh.quality.length !== nTris) return null;
 
     const faceColors = getColorArray(mesh.quality, viewerOptions.colormap);
@@ -123,22 +195,177 @@ function MeshGeometry({
     viewerOptions.qualityMetric,
     viewerOptions.colormap,
     showTetrahedraFaces,
+    sizeField,
+    showSizeField,
   ]);
 
-  // Set colors on geometry for surface triangles (MMGS/MMG2D with quality)
+  // Set colors on geometry for surface triangles
   useMemo(() => {
-    // For clipped tetrahedra view, colors are already set in the geometry useMemo
     if (showTetrahedraFaces) {
       return;
     }
 
     if (colors) {
-      // Geometry is already non-indexed, just add the color attribute
       geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     } else if (geometry.hasAttribute("color")) {
       geometry.deleteAttribute("color");
     }
   }, [colors, geometry, showTetrahedraFaces]);
+
+  // Convert screen coordinates to mesh hit point
+  const getHitPoint = useCallback(
+    (event: PointerEvent | MouseEvent): THREE.Vector3 | null => {
+      if (!meshRef.current) return null;
+
+      const rect = gl.domElement.getBoundingClientRect();
+      const mouse = new THREE.Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1,
+      );
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObject(meshRef.current);
+
+      if (intersects.length > 0 && intersects[0]) {
+        return intersects[0].point.clone().add(boundingBox.center);
+      }
+      return null;
+    },
+    [camera, gl.domElement, raycaster, boundingBox.center],
+  );
+
+  // Get intersection normal
+  const getHitNormal = useCallback(
+    (event: PointerEvent | MouseEvent): THREE.Vector3 | null => {
+      if (!meshRef.current) return null;
+
+      const rect = gl.domElement.getBoundingClientRect();
+      const mouse = new THREE.Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1,
+      );
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObject(meshRef.current);
+
+      const firstIntersect = intersects[0];
+      if (intersects.length > 0 && firstIntersect?.face) {
+        return firstIntersect.face.normal.clone();
+      }
+      return null;
+    },
+    [camera, gl.domElement, raycaster],
+  );
+
+  // Paint at a given point
+  const doPaint = useCallback(
+    (hitPoint: THREE.Vector3) => {
+      // Initialize size field if needed
+      let currentField = sizeField;
+      if (!currentField) {
+        currentField = initializeSizeField(mesh, false, meshScale * 0.1);
+      }
+
+      // Paint
+      const newField = paintSizeField(
+        currentField,
+        mesh,
+        false,
+        hitPoint,
+        brushSettings,
+        meshDiagonal,
+      );
+
+      setSizeField(meshType, newField);
+    },
+    [
+      mesh,
+      meshType,
+      meshDiagonal,
+      meshScale,
+      brushSettings,
+      sizeField,
+      setSizeField,
+    ],
+  );
+
+  // Handle pointer events for painting
+  useEffect(() => {
+    if (!paintModeEnabled) return;
+
+    const canvas = gl.domElement;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.button !== 0) return; // Left click only
+      event.preventDefault();
+      setIsPainting(true);
+
+      const hitPoint = getHitPoint(event);
+      if (hitPoint) {
+        doPaint(hitPoint);
+      }
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      // Update brush cursor
+      const hitPoint = getHitPoint(event);
+      const hitNormal = getHitNormal(event);
+
+      if (hitPoint) {
+        // Transform to centered coordinates for visualization
+        setBrushPosition(hitPoint.clone().sub(boundingBox.center));
+        setBrushNormal(hitNormal);
+      } else {
+        setBrushPosition(null);
+        setBrushNormal(null);
+      }
+
+      // Paint if dragging
+      if (isPainting && hitPoint) {
+        doPaint(hitPoint);
+      }
+    };
+
+    const handlePointerUp = () => {
+      setIsPainting(false);
+    };
+
+    const handlePointerLeave = () => {
+      setBrushPosition(null);
+      setBrushNormal(null);
+    };
+
+    canvas.addEventListener("pointerdown", handlePointerDown);
+    canvas.addEventListener("pointermove", handlePointerMove);
+    canvas.addEventListener("pointerup", handlePointerUp);
+    canvas.addEventListener("pointerleave", handlePointerLeave);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      canvas.removeEventListener("pointerdown", handlePointerDown);
+      canvas.removeEventListener("pointermove", handlePointerMove);
+      canvas.removeEventListener("pointerup", handlePointerUp);
+      canvas.removeEventListener("pointerleave", handlePointerLeave);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [
+    paintModeEnabled,
+    isPainting,
+    gl.domElement,
+    getHitPoint,
+    getHitNormal,
+    doPaint,
+    setIsPainting,
+    boundingBox.center,
+  ]);
+
+  // Clear brush cursor when paint mode is disabled
+  useEffect(() => {
+    if (!paintModeEnabled) {
+      setBrushPosition(null);
+      setBrushNormal(null);
+    }
+  }, [paintModeEnabled]);
 
   const wireframeColor = "#000000";
   const faceColor = theme === "dark" ? "#6b7280" : "#e8f4fd";
@@ -174,12 +401,52 @@ function MeshGeometry({
           <pointsMaterial color="#dc3545" size={0.02} sizeAttenuation />
         </points>
       )}
+      {/* Brush cursor */}
+      <BrushCursor
+        position={brushPosition}
+        normal={brushNormal}
+        radius={brushRadius}
+        visible={paintModeEnabled && brushPosition !== null}
+      />
     </group>
   );
 }
 
-export function MeshViewer3D({ mesh }: MeshViewer3DProps) {
+function SceneContent({
+  mesh,
+  meshType,
+  boundingBox,
+}: {
+  mesh: MeshData;
+  meshType: MeshType;
+  boundingBox: {
+    min: THREE.Vector3;
+    max: THREE.Vector3;
+    center: THREE.Vector3;
+  };
+}) {
+  const { paintModeEnabled, isPainting } = usePaintStore();
+
+  return (
+    <>
+      <Environment preset="studio" background={false} />
+      <ambientLight intensity={1.2} />
+      <MeshGeometry mesh={mesh} meshType={meshType} boundingBox={boundingBox} />
+      <TrackballControls
+        makeDefault
+        rotateSpeed={3}
+        enabled={!paintModeEnabled || !isPainting}
+      />
+      <GizmoHelper alignment="bottom-right" margin={[60, 60]}>
+        <GizmoViewport labelColor="white" axisHeadScale={1} />
+      </GizmoHelper>
+    </>
+  );
+}
+
+export function MeshViewer3D({ mesh, meshType }: MeshViewer3DProps) {
   const { theme } = useMeshStore();
+  const { paintModeEnabled } = usePaintStore();
   const backgroundColor = theme === "dark" ? "#1f2937" : "#f8f9fa";
 
   const boundingBox = useMemo(() => {
@@ -188,7 +455,10 @@ export function MeshViewer3D({ mesh }: MeshViewer3DProps) {
   }, [mesh]);
 
   return (
-    <div className="viewer-container h-full">
+    <div
+      className="viewer-container h-full"
+      style={{ cursor: paintModeEnabled ? "crosshair" : "default" }}
+    >
       {mesh && boundingBox ? (
         <CanvasErrorBoundary>
           <Canvas
@@ -200,13 +470,11 @@ export function MeshViewer3D({ mesh }: MeshViewer3DProps) {
               toneMappingExposure: 1.0,
             }}
           >
-            <Environment preset="studio" background={false} />
-            <ambientLight intensity={1.2} />
-            <MeshGeometry mesh={mesh} boundingBox={boundingBox} />
-            <TrackballControls makeDefault rotateSpeed={3} />
-            <GizmoHelper alignment="bottom-right" margin={[60, 60]}>
-              <GizmoViewport labelColor="white" axisHeadScale={1} />
-            </GizmoHelper>
+            <SceneContent
+              mesh={mesh}
+              meshType={meshType}
+              boundingBox={boundingBox}
+            />
           </Canvas>
         </CanvasErrorBoundary>
       ) : (

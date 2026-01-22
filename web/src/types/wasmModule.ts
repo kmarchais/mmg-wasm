@@ -69,6 +69,13 @@ export interface MmgModule {
     handle: number,
     outCountPtr: number,
   ) => number;
+  _mmg2d_set_sol_size: (
+    handle: number,
+    typEntity: number,
+    nEntities: number,
+    typSol: number,
+  ) => number;
+  _mmg2d_set_scalar_sols: (handle: number, valuesPtr: number) => number;
 
   // MMGS functions
   _mmgs_init: () => number;
@@ -114,6 +121,13 @@ export interface MmgModule {
     handle: number,
     outCountPtr: number,
   ) => number;
+  _mmgs_set_sol_size: (
+    handle: number,
+    typEntity: number,
+    nEntities: number,
+    typSol: number,
+  ) => number;
+  _mmgs_set_scalar_sols: (handle: number, valuesPtr: number) => number;
 
   // MMG3D functions
   _mmg3d_init: () => number;
@@ -173,6 +187,13 @@ export interface MmgModule {
     handle: number,
     outCountPtr: number,
   ) => number;
+  _mmg3d_set_sol_size: (
+    handle: number,
+    typEntity: number,
+    nEntities: number,
+    typSol: number,
+  ) => number;
+  _mmg3d_set_scalar_sols: (handle: number, valuesPtr: number) => number;
 
   // String helpers
   lengthBytesUTF8: (str: string) => number;
