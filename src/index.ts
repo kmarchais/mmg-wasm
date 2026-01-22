@@ -61,6 +61,9 @@ export {
 // Export FS types
 export type { EmscriptenFS, PathAnalysis } from "./fs";
 
+// Export unified Mesh class
+export { Mesh, MeshType, type MeshData, type LoadOptions } from "./mesh";
+
 // Export memory utilities
 export {
   toWasmFloat64,
