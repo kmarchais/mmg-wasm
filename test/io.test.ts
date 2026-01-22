@@ -6,6 +6,8 @@ import {
   MMG3D,
   getFS,
   IPARAM,
+  SOL_ENTITY,
+  SOL_TYPE,
   type MeshHandle,
 } from "../src/mmg3d";
 import {
@@ -13,6 +15,8 @@ import {
   MMG2D,
   getFS2D,
   IPARAM_2D,
+  SOL_ENTITY_2D,
+  SOL_TYPE_2D,
   type MeshHandle2D,
 } from "../src/mmg2d";
 import {
@@ -20,6 +24,8 @@ import {
   MMGS,
   getFSS,
   IPARAM_S,
+  SOL_ENTITY_S,
+  SOL_TYPE_S,
   type MeshHandleS,
 } from "../src/mmgs";
 
@@ -75,10 +81,18 @@ describe("File I/O", () => {
 
       // Set vertices
       const vertices = new Float64Array([
-        0, 0, 0,
-        1, 0, 0,
-        0.5, Math.sqrt(3) / 2, 0,
-        0.5, Math.sqrt(3) / 6, Math.sqrt(2 / 3),
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0.5,
+        Math.sqrt(3) / 2,
+        0,
+        0.5,
+        Math.sqrt(3) / 6,
+        Math.sqrt(2 / 3),
       ]);
       MMG3D.setVertices(handle, vertices);
 
@@ -87,12 +101,7 @@ describe("File I/O", () => {
       MMG3D.setTetrahedra(handle, tetrahedra);
 
       // Set boundary triangles
-      const triangles = new Int32Array([
-        1, 2, 3,
-        1, 2, 4,
-        2, 3, 4,
-        3, 1, 4,
-      ]);
+      const triangles = new Int32Array([1, 2, 3, 1, 2, 4, 2, 3, 4, 3, 1, 4]);
       MMG3D.setTriangles(handle, triangles);
 
       // Save mesh to virtual filesystem
@@ -198,22 +207,14 @@ describe("File I/O", () => {
       MMG3D.setMeshSize(handle, 4, 1, 0, 4, 0, 0);
 
       const vertices = new Float64Array([
-        0, 0, 0,
-        1, 0, 0,
-        0.5, 0.866, 0,
-        0.5, 0.289, 0.816,
+        0, 0, 0, 1, 0, 0, 0.5, 0.866, 0, 0.5, 0.289, 0.816,
       ]);
       MMG3D.setVertices(handle, vertices);
 
       const tetrahedra = new Int32Array([1, 2, 3, 4]);
       MMG3D.setTetrahedra(handle, tetrahedra);
 
-      const triangles = new Int32Array([
-        1, 2, 3,
-        1, 2, 4,
-        2, 3, 4,
-        3, 1, 4,
-      ]);
+      const triangles = new Int32Array([1, 2, 3, 1, 2, 4, 2, 3, 4, 3, 1, 4]);
       MMG3D.setTriangles(handle, triangles);
 
       // Save as binary format
@@ -314,26 +315,13 @@ describe("File I/O", () => {
       // 4 vertices, 2 triangles, 4 boundary edges
       MMG2D.setMeshSize(handle, 4, 2, 0, 4);
 
-      const vertices = new Float64Array([
-        0, 0,
-        1, 0,
-        1, 1,
-        0, 1,
-      ]);
+      const vertices = new Float64Array([0, 0, 1, 0, 1, 1, 0, 1]);
       MMG2D.setVertices(handle, vertices);
 
-      const triangles = new Int32Array([
-        1, 2, 3,
-        1, 3, 4,
-      ]);
+      const triangles = new Int32Array([1, 2, 3, 1, 3, 4]);
       MMG2D.setTriangles(handle, triangles);
 
-      const edges = new Int32Array([
-        1, 2,
-        2, 3,
-        3, 4,
-        4, 1,
-      ]);
+      const edges = new Int32Array([1, 2, 2, 3, 3, 4, 4, 1]);
       MMG2D.setEdges(handle, edges);
 
       // Save mesh
@@ -430,19 +418,11 @@ describe("File I/O", () => {
       MMGS.setMeshSize(handle, 4, 4, 0);
 
       const vertices = new Float64Array([
-        0, 0, 0,
-        1, 0, 0,
-        0.5, 0.866, 0,
-        0.5, 0.289, 0.816,
+        0, 0, 0, 1, 0, 0, 0.5, 0.866, 0, 0.5, 0.289, 0.816,
       ]);
       MMGS.setVertices(handle, vertices);
 
-      const triangles = new Int32Array([
-        1, 2, 3,
-        1, 2, 4,
-        2, 3, 4,
-        3, 1, 4,
-      ]);
+      const triangles = new Int32Array([1, 2, 3, 1, 2, 4, 2, 3, 4, 3, 1, 4]);
       MMGS.setTriangles(handle, triangles);
 
       // Save mesh
@@ -523,6 +503,253 @@ describe("File I/O", () => {
 
       // Clean up
       FS.unlink("/test.txt");
+    });
+  });
+
+  describe("Solution File I/O", () => {
+    describe("MMG3D Solution Files", () => {
+      const handles: MeshHandle[] = [];
+
+      beforeAll(async () => {
+        await initMMG3D();
+      });
+
+      afterEach(() => {
+        const FS = getFS();
+        for (const handle of handles) {
+          try {
+            MMG3D.free(handle);
+          } catch {
+            // Ignore errors from already-freed handles
+          }
+        }
+        handles.length = 0;
+
+        // Clean up virtual filesystem
+        for (const file of ["/mesh.mesh", "/output.sol", "/metric.sol"]) {
+          try {
+            FS.unlink(file);
+          } catch {
+            // File may not exist
+          }
+        }
+      });
+
+      it("should save and load scalar solution file (round-trip)", () => {
+        const FS = getFS();
+
+        // Create a simple tetrahedron mesh
+        const handle = MMG3D.init();
+        handles.push(handle);
+        MMG3D.setIParam(handle, IPARAM.verbose, -1);
+
+        MMG3D.setMeshSize(handle, 4, 1, 0, 4, 0, 0);
+
+        const vertices = new Float64Array([
+          0, 0, 0, 1, 0, 0, 0.5, 0.866, 0, 0.5, 0.289, 0.816,
+        ]);
+        MMG3D.setVertices(handle, vertices);
+
+        const tetrahedra = new Int32Array([1, 2, 3, 4]);
+        MMG3D.setTetrahedra(handle, tetrahedra);
+
+        const triangles = new Int32Array([1, 2, 3, 1, 2, 4, 2, 3, 4, 3, 1, 4]);
+        MMG3D.setTriangles(handle, triangles);
+
+        // Set scalar solution (metric values at each vertex)
+        MMG3D.setSolSize(handle, SOL_ENTITY.VERTEX, 4, SOL_TYPE.SCALAR);
+        const metric = new Float64Array([0.1, 0.2, 0.15, 0.25]);
+        MMG3D.setScalarSols(handle, metric);
+
+        // Save mesh and solution
+        MMG3D.saveMesh(handle, "/mesh.mesh");
+        MMG3D.saveSol(handle, "/metric.sol");
+
+        // Verify solution file exists
+        const analysis = FS.analyzePath("/metric.sol");
+        expect(analysis.exists).toBe(true);
+
+        // Load into a new handle
+        const handle2 = MMG3D.init();
+        handles.push(handle2);
+        MMG3D.setIParam(handle2, IPARAM.verbose, -1);
+
+        MMG3D.loadMesh(handle2, "/mesh.mesh");
+        MMG3D.loadSol(handle2, "/metric.sol");
+
+        // Verify solution was loaded
+        const solInfo = MMG3D.getSolSize(handle2);
+        expect(solInfo.nEntities).toBe(4);
+        expect(solInfo.typSol).toBe(SOL_TYPE.SCALAR);
+
+        // Verify solution values
+        const loadedMetric = MMG3D.getScalarSols(handle2);
+        expect(loadedMetric.length).toBe(4);
+        for (let i = 0; i < 4; i++) {
+          expect(loadedMetric[i]).toBeCloseTo(metric[i], 5);
+        }
+      });
+    });
+
+    describe("MMG2D Solution Files", () => {
+      const handles: MeshHandle2D[] = [];
+
+      beforeAll(async () => {
+        await initMMG2D();
+      });
+
+      afterEach(() => {
+        const FS = getFS2D();
+        for (const handle of handles) {
+          try {
+            MMG2D.free(handle);
+          } catch {
+            // Ignore errors from already-freed handles
+          }
+        }
+        handles.length = 0;
+
+        for (const file of ["/square2d.mesh", "/metric2d.sol"]) {
+          try {
+            FS.unlink(file);
+          } catch {
+            // File may not exist
+          }
+        }
+      });
+
+      it("should save and load scalar solution file (round-trip)", () => {
+        const FS = getFS2D();
+
+        // Create a simple 2D mesh
+        const handle = MMG2D.init();
+        handles.push(handle);
+        MMG2D.setIParam(handle, IPARAM_2D.verbose, -1);
+
+        MMG2D.setMeshSize(handle, 4, 2, 0, 4);
+
+        const vertices = new Float64Array([0, 0, 1, 0, 1, 1, 0, 1]);
+        MMG2D.setVertices(handle, vertices);
+
+        const triangles = new Int32Array([1, 2, 3, 1, 3, 4]);
+        MMG2D.setTriangles(handle, triangles);
+
+        const edges = new Int32Array([1, 2, 2, 3, 3, 4, 4, 1]);
+        MMG2D.setEdges(handle, edges);
+
+        // Set scalar solution (metric values at each vertex)
+        MMG2D.setSolSize(handle, SOL_ENTITY_2D.VERTEX, 4, SOL_TYPE_2D.SCALAR);
+        const metric = new Float64Array([0.1, 0.2, 0.15, 0.25]);
+        MMG2D.setScalarSols(handle, metric);
+
+        // Save mesh and solution
+        MMG2D.saveMesh(handle, "/square2d.mesh");
+        MMG2D.saveSol(handle, "/metric2d.sol");
+
+        // Verify solution file exists
+        const analysis = FS.analyzePath("/metric2d.sol");
+        expect(analysis.exists).toBe(true);
+
+        // Load into a new handle
+        const handle2 = MMG2D.init();
+        handles.push(handle2);
+        MMG2D.setIParam(handle2, IPARAM_2D.verbose, -1);
+
+        MMG2D.loadMesh(handle2, "/square2d.mesh");
+        MMG2D.loadSol(handle2, "/metric2d.sol");
+
+        // Verify solution was loaded
+        const solInfo = MMG2D.getSolSize(handle2);
+        expect(solInfo.nEntities).toBe(4);
+        expect(solInfo.typSol).toBe(SOL_TYPE_2D.SCALAR);
+
+        // Verify solution values
+        const loadedMetric = MMG2D.getScalarSols(handle2);
+        expect(loadedMetric.length).toBe(4);
+        for (let i = 0; i < 4; i++) {
+          expect(loadedMetric[i]).toBeCloseTo(metric[i], 5);
+        }
+      });
+    });
+
+    describe("MMGS Solution Files", () => {
+      const handles: MeshHandleS[] = [];
+
+      beforeAll(async () => {
+        await initMMGS();
+      });
+
+      afterEach(() => {
+        const FS = getFSS();
+        for (const handle of handles) {
+          try {
+            MMGS.free(handle);
+          } catch {
+            // Ignore errors from already-freed handles
+          }
+        }
+        handles.length = 0;
+
+        for (const file of ["/surface_s.mesh", "/metric_s.sol"]) {
+          try {
+            FS.unlink(file);
+          } catch {
+            // File may not exist
+          }
+        }
+      });
+
+      it("should save and load scalar solution file (round-trip)", () => {
+        const FS = getFSS();
+
+        // Create a simple surface mesh (tetrahedron surface)
+        const handle = MMGS.init();
+        handles.push(handle);
+        MMGS.setIParam(handle, IPARAM_S.verbose, -1);
+
+        MMGS.setMeshSize(handle, 4, 4, 0);
+
+        const vertices = new Float64Array([
+          0, 0, 0, 1, 0, 0, 0.5, 0.866, 0, 0.5, 0.289, 0.816,
+        ]);
+        MMGS.setVertices(handle, vertices);
+
+        const triangles = new Int32Array([1, 2, 3, 1, 2, 4, 2, 3, 4, 3, 1, 4]);
+        MMGS.setTriangles(handle, triangles);
+
+        // Set scalar solution (metric values at each vertex)
+        MMGS.setSolSize(handle, SOL_ENTITY_S.VERTEX, 4, SOL_TYPE_S.SCALAR);
+        const metric = new Float64Array([0.1, 0.2, 0.15, 0.25]);
+        MMGS.setScalarSols(handle, metric);
+
+        // Save mesh and solution
+        MMGS.saveMesh(handle, "/surface_s.mesh");
+        MMGS.saveSol(handle, "/metric_s.sol");
+
+        // Verify solution file exists
+        const analysis = FS.analyzePath("/metric_s.sol");
+        expect(analysis.exists).toBe(true);
+
+        // Load into a new handle
+        const handle2 = MMGS.init();
+        handles.push(handle2);
+        MMGS.setIParam(handle2, IPARAM_S.verbose, -1);
+
+        MMGS.loadMesh(handle2, "/surface_s.mesh");
+        MMGS.loadSol(handle2, "/metric_s.sol");
+
+        // Verify solution was loaded
+        const solInfo = MMGS.getSolSize(handle2);
+        expect(solInfo.nEntities).toBe(4);
+        expect(solInfo.typSol).toBe(SOL_TYPE_S.SCALAR);
+
+        // Verify solution values
+        const loadedMetric = MMGS.getScalarSols(handle2);
+        expect(loadedMetric.length).toBe(4);
+        for (let i = 0; i < 4; i++) {
+          expect(loadedMetric[i]).toBeCloseTo(metric[i], 5);
+        }
+      });
     });
   });
 });

@@ -193,6 +193,39 @@ describe("MMG2D", () => {
         /must match number of vertices/,
       );
     });
+
+    it("should return 2D vertices (x, y pairs) not 3D", () => {
+      // Verify getVertices returns (x, y) pairs, not (x, y, z)
+      const handle = MMG2D.init();
+      handles.push(handle);
+
+      MMG2D.setMeshSize(handle, 4, 2, 0, 4);
+
+      const vertices = new Float64Array([
+        0.0,
+        0.0, // vertex 1
+        1.0,
+        0.0, // vertex 2
+        1.0,
+        1.0, // vertex 3
+        0.0,
+        1.0, // vertex 4
+      ]);
+      MMG2D.setVertices(handle, vertices);
+
+      const result = MMG2D.getVertices(handle);
+
+      // Should be 8 values (4 vertices * 2 coordinates), not 12 (4 * 3)
+      expect(result.length).toBe(8);
+      expect(result.length % 2).toBe(0); // Even number (x, y pairs)
+      expect(result.length).not.toBe(12); // Not 3D coordinates
+
+      // Verify coordinates are correct 2D values
+      expect(result[0]).toBeCloseTo(0.0); // v1.x
+      expect(result[1]).toBeCloseTo(0.0); // v1.y
+      expect(result[2]).toBeCloseTo(1.0); // v2.x
+      expect(result[3]).toBeCloseTo(0.0); // v2.y
+    });
   });
 
   describe("Triangles", () => {
@@ -508,10 +541,18 @@ describe("MMG2D", () => {
 
       // Set tensor values: m11, m12, m22 per vertex
       const tensorMetric = new Float64Array([
-        1.0, 0.0, 1.0, // vertex 1
-        2.0, 0.0, 2.0, // vertex 2
-        1.5, 0.0, 1.5, // vertex 3
-        1.0, 0.0, 1.0, // vertex 4
+        1.0,
+        0.0,
+        1.0, // vertex 1
+        2.0,
+        0.0,
+        2.0, // vertex 2
+        1.5,
+        0.0,
+        1.5, // vertex 3
+        1.0,
+        0.0,
+        1.0, // vertex 4
       ]);
       MMG2D.setTensorSols(handle, tensorMetric);
 
@@ -538,17 +579,25 @@ describe("MMG2D", () => {
 
       // Set triangles
       const tria = new Int32Array([
-        1, 2, 3, // lower-right
-        1, 3, 4, // upper-left
+        1,
+        2,
+        3, // lower-right
+        1,
+        3,
+        4, // upper-left
       ]);
       MMG2D.setTriangles(handle, tria);
 
       // Set boundary edges
       const edges = new Int32Array([
-        1, 2, // bottom
-        2, 3, // right
-        3, 4, // top
-        4, 1, // left
+        1,
+        2, // bottom
+        2,
+        3, // right
+        3,
+        4, // top
+        4,
+        1, // left
       ]);
       MMG2D.setEdges(handle, edges);
 
