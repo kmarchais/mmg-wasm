@@ -1,22 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it } from "bun:test";
-import {
-  IPARAM,
-  MMG3D,
-  type MeshHandle,
-  initMMG3D,
-} from "../src/mmg3d";
-import {
-  IPARAM_2D,
-  MMG2D,
-  type MeshHandle2D,
-  initMMG2D,
-} from "../src/mmg2d";
-import {
-  IPARAM_S,
-  MMGS,
-  type MeshHandleS,
-  initMMGS,
-} from "../src/mmgs";
+import { IPARAM, MMG3D, type MeshHandle, initMMG3D } from "../src/mmg3d";
+import { IPARAM_2D, MMG2D, type MeshHandle2D, initMMG2D } from "../src/mmg2d";
+import { IPARAM_S, MMGS, type MeshHandleS, initMMGS } from "../src/mmgs";
 import {
   cubeVertices,
   cubeTetrahedra,
@@ -58,7 +43,13 @@ describe("Quality Functions", () => {
       handles.push(handle);
 
       MMG2D.setIParam(handle, IPARAM_2D.verbose, -1);
-      MMG2D.setMeshSize(handle, squareNVertices, squareNTriangles, 0, squareNEdges);
+      MMG2D.setMeshSize(
+        handle,
+        squareNVertices,
+        squareNTriangles,
+        0,
+        squareNEdges,
+      );
       MMG2D.setVertices(handle, squareVertices);
       MMG2D.setTriangles(handle, squareTriangles);
       MMG2D.setEdges(handle, squareEdges);
@@ -79,7 +70,13 @@ describe("Quality Functions", () => {
       handles.push(handle);
 
       MMG2D.setIParam(handle, IPARAM_2D.verbose, -1);
-      MMG2D.setMeshSize(handle, squareNVertices, squareNTriangles, 0, squareNEdges);
+      MMG2D.setMeshSize(
+        handle,
+        squareNVertices,
+        squareNTriangles,
+        0,
+        squareNEdges,
+      );
       MMG2D.setVertices(handle, squareVertices);
       MMG2D.setTriangles(handle, squareTriangles);
       MMG2D.setEdges(handle, squareEdges);
@@ -145,19 +142,11 @@ describe("Quality Functions", () => {
 
       // Simple tetrahedron surface mesh (4 triangular faces)
       const vertices = new Float64Array([
-        0.0, 0.0, 0.0,
-        1.0, 0.0, 0.0,
-        0.5, 0.87, 0.0,
-        0.5, 0.29, 0.82,
+        0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.5, 0.87, 0.0, 0.5, 0.29, 0.82,
       ]);
       MMGS.setVertices(handle, vertices);
 
-      const triangles = new Int32Array([
-        1, 3, 2,
-        1, 2, 4,
-        2, 3, 4,
-        3, 1, 4,
-      ]);
+      const triangles = new Int32Array([1, 3, 2, 1, 2, 4, 2, 3, 4, 3, 1, 4]);
       MMGS.setTriangles(handle, triangles);
 
       const edges = new Int32Array([1, 2, 2, 3, 3, 1, 1, 4, 2, 4, 3, 4]);
@@ -182,19 +171,11 @@ describe("Quality Functions", () => {
       MMGS.setMeshSize(handle, 4, 4, 6);
 
       const vertices = new Float64Array([
-        0.0, 0.0, 0.0,
-        1.0, 0.0, 0.0,
-        0.5, 0.87, 0.0,
-        0.5, 0.29, 0.82,
+        0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.5, 0.87, 0.0, 0.5, 0.29, 0.82,
       ]);
       MMGS.setVertices(handle, vertices);
 
-      const triangles = new Int32Array([
-        1, 3, 2,
-        1, 2, 4,
-        2, 3, 4,
-        3, 1, 4,
-      ]);
+      const triangles = new Int32Array([1, 3, 2, 1, 2, 4, 2, 3, 4, 3, 1, 4]);
       MMGS.setTriangles(handle, triangles);
 
       const edges = new Int32Array([1, 2, 2, 3, 3, 1, 1, 4, 2, 4, 3, 4]);
@@ -240,7 +221,15 @@ describe("Quality Functions", () => {
       handles.push(handle);
 
       MMG3D.setIParam(handle, IPARAM.verbose, -1);
-      MMG3D.setMeshSize(handle, cubeNVertices, nTetrahedra, 0, cubeNTriangles, 0, 0);
+      MMG3D.setMeshSize(
+        handle,
+        cubeNVertices,
+        nTetrahedra,
+        0,
+        cubeNTriangles,
+        0,
+        0,
+      );
       MMG3D.setVertices(handle, cubeVertices);
       MMG3D.setTetrahedra(handle, cubeTetrahedra);
       MMG3D.setTriangles(handle, cubeTriangles);
@@ -261,7 +250,15 @@ describe("Quality Functions", () => {
       handles.push(handle);
 
       MMG3D.setIParam(handle, IPARAM.verbose, -1);
-      MMG3D.setMeshSize(handle, cubeNVertices, nTetrahedra, 0, cubeNTriangles, 0, 0);
+      MMG3D.setMeshSize(
+        handle,
+        cubeNVertices,
+        nTetrahedra,
+        0,
+        cubeNTriangles,
+        0,
+        0,
+      );
       MMG3D.setVertices(handle, cubeVertices);
       MMG3D.setTetrahedra(handle, cubeTetrahedra);
       MMG3D.setTriangles(handle, cubeTriangles);
@@ -301,7 +298,15 @@ describe("Quality Functions", () => {
       handles.push(handle);
 
       MMG3D.setIParam(handle, IPARAM.verbose, -1);
-      MMG3D.setMeshSize(handle, cubeNVertices, nTetrahedra, 0, cubeNTriangles, 0, 0);
+      MMG3D.setMeshSize(
+        handle,
+        cubeNVertices,
+        nTetrahedra,
+        0,
+        cubeNTriangles,
+        0,
+        0,
+      );
       MMG3D.setVertices(handle, cubeVertices);
       MMG3D.setTetrahedra(handle, cubeTetrahedra);
       MMG3D.setTriangles(handle, cubeTriangles);

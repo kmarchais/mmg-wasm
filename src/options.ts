@@ -179,6 +179,27 @@ export class RemeshOptionsError extends Error {
  * @throws RemeshOptionsError if any option is invalid
  */
 export function validateOptions(options: RemeshOptions): void {
+  // Check for NaN values in numeric fields
+  const numericFields: (keyof RemeshOptions)[] = [
+    "hmin",
+    "hmax",
+    "hsiz",
+    "hausd",
+    "hgrad",
+    "angleDetection",
+    "verbose",
+  ];
+  for (const field of numericFields) {
+    const value = options[field];
+    if (
+      value !== undefined &&
+      typeof value === "number" &&
+      Number.isNaN(value)
+    ) {
+      throw new RemeshOptionsError(`${field} must not be NaN`);
+    }
+  }
+
   if (options.hmin !== undefined && options.hmax !== undefined) {
     if (options.hmin > options.hmax) {
       throw new RemeshOptionsError("hmin must be <= hmax");

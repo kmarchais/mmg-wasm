@@ -30,20 +30,32 @@ describe("RemeshOptions Validation", () => {
     });
 
     it("throws when hmin <= 0", () => {
-      expect(() => validateOptions({ hmin: 0 })).toThrow("hmin must be positive");
-      expect(() => validateOptions({ hmin: -0.1 })).toThrow("hmin must be positive");
+      expect(() => validateOptions({ hmin: 0 })).toThrow(
+        "hmin must be positive",
+      );
+      expect(() => validateOptions({ hmin: -0.1 })).toThrow(
+        "hmin must be positive",
+      );
     });
 
     it("throws when hmax <= 0", () => {
-      expect(() => validateOptions({ hmax: 0 })).toThrow("hmax must be positive");
-      expect(() => validateOptions({ hmax: -0.1 })).toThrow("hmax must be positive");
+      expect(() => validateOptions({ hmax: 0 })).toThrow(
+        "hmax must be positive",
+      );
+      expect(() => validateOptions({ hmax: -0.1 })).toThrow(
+        "hmax must be positive",
+      );
     });
   });
 
   describe("hsiz constraints", () => {
     it("throws when hsiz <= 0", () => {
-      expect(() => validateOptions({ hsiz: 0 })).toThrow("hsiz must be positive");
-      expect(() => validateOptions({ hsiz: -0.1 })).toThrow("hsiz must be positive");
+      expect(() => validateOptions({ hsiz: 0 })).toThrow(
+        "hsiz must be positive",
+      );
+      expect(() => validateOptions({ hsiz: -0.1 })).toThrow(
+        "hsiz must be positive",
+      );
     });
 
     it("allows positive hsiz", () => {
@@ -53,8 +65,12 @@ describe("RemeshOptions Validation", () => {
 
   describe("hausd constraints", () => {
     it("throws when hausd <= 0", () => {
-      expect(() => validateOptions({ hausd: 0 })).toThrow("hausd must be positive");
-      expect(() => validateOptions({ hausd: -0.001 })).toThrow("hausd must be positive");
+      expect(() => validateOptions({ hausd: 0 })).toThrow(
+        "hausd must be positive",
+      );
+      expect(() => validateOptions({ hausd: -0.001 })).toThrow(
+        "hausd must be positive",
+      );
     });
 
     it("allows positive hausd", () => {
@@ -143,6 +159,50 @@ describe("RemeshOptions Validation", () => {
   describe("empty options", () => {
     it("allows empty options object", () => {
       expect(() => validateOptions({})).not.toThrow();
+    });
+  });
+
+  describe("NaN constraints", () => {
+    it("throws when hmin is NaN", () => {
+      expect(() => validateOptions({ hmin: NaN })).toThrow(
+        "hmin must not be NaN",
+      );
+    });
+
+    it("throws when hmax is NaN", () => {
+      expect(() => validateOptions({ hmax: NaN })).toThrow(
+        "hmax must not be NaN",
+      );
+    });
+
+    it("throws when hsiz is NaN", () => {
+      expect(() => validateOptions({ hsiz: NaN })).toThrow(
+        "hsiz must not be NaN",
+      );
+    });
+
+    it("throws when hausd is NaN", () => {
+      expect(() => validateOptions({ hausd: NaN })).toThrow(
+        "hausd must not be NaN",
+      );
+    });
+
+    it("throws when hgrad is NaN", () => {
+      expect(() => validateOptions({ hgrad: NaN })).toThrow(
+        "hgrad must not be NaN",
+      );
+    });
+
+    it("throws when angleDetection is NaN", () => {
+      expect(() => validateOptions({ angleDetection: NaN })).toThrow(
+        "angleDetection must not be NaN",
+      );
+    });
+
+    it("throws when verbose is NaN", () => {
+      expect(() => validateOptions({ verbose: NaN })).toThrow(
+        "verbose must not be NaN",
+      );
     });
   });
 });
@@ -300,7 +360,9 @@ describe("applyOptions", () => {
         verbose: -1,
       };
 
-      expect(() => applyOptions(handle, MeshType.Mesh3D, options)).not.toThrow();
+      expect(() =>
+        applyOptions(handle, MeshType.Mesh3D, options),
+      ).not.toThrow();
     });
 
     it("applies preset options", () => {
@@ -325,7 +387,9 @@ describe("applyOptions", () => {
         verbose: -1,
       };
 
-      expect(() => applyOptions(handle, MeshType.Mesh3D, options)).not.toThrow();
+      expect(() =>
+        applyOptions(handle, MeshType.Mesh3D, options),
+      ).not.toThrow();
     });
   });
 
@@ -342,7 +406,9 @@ describe("applyOptions", () => {
         verbose: -1,
       };
 
-      expect(() => applyOptions(handle, MeshType.Mesh2D, options)).not.toThrow();
+      expect(() =>
+        applyOptions(handle, MeshType.Mesh2D, options),
+      ).not.toThrow();
     });
 
     it("applies preset options", () => {

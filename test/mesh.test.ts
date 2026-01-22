@@ -5,11 +5,7 @@ import { Mesh, MeshType } from "../src/mesh";
 import { initMMG3D } from "../src/mmg3d";
 import { initMMG2D } from "../src/mmg2d";
 import { initMMGS } from "../src/mmgs";
-import {
-  cubeVertices,
-  cubeTetrahedra,
-  cubeTriangles,
-} from "./fixtures/cube";
+import { cubeVertices, cubeTetrahedra, cubeTriangles } from "./fixtures/cube";
 import {
   squareVertices,
   squareTriangles,
@@ -406,17 +402,9 @@ describe("Mesh Class", () => {
     it("should handle surface mesh with edges", () => {
       // Simple tetrahedron surface (4 triangles)
       const vertices = new Float64Array([
-        0, 0, 0,
-        1, 0, 0,
-        0.5, 0.866, 0,
-        0.5, 0.289, 0.816,
+        0, 0, 0, 1, 0, 0, 0.5, 0.866, 0, 0.5, 0.289, 0.816,
       ]);
-      const triangles = new Int32Array([
-        1, 2, 3,
-        1, 2, 4,
-        2, 3, 4,
-        3, 1, 4,
-      ]);
+      const triangles = new Int32Array([1, 2, 3, 1, 2, 4, 2, 3, 4, 3, 1, 4]);
 
       const mesh = new Mesh({
         vertices,
