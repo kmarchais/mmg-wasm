@@ -744,5 +744,289 @@ describe("Mesh Class", () => {
         expect(cells.length).toBe(result.nCells * 4); // tetrahedra have 4 vertices
       });
     });
+
+    describe("Local refinement", () => {
+      it("should refine 3D mesh in spherical region", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        const originalVertexCount = mesh.nVertices;
+
+        // Refine around center of cube
+        mesh.setSizeSphere([0.5, 0.5, 0.5], 0.3, 0.1);
+        expect(mesh.localSizeCount).toBe(1);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+        expect(result.nVertices).toBeGreaterThan(originalVertexCount);
+      });
+
+      it("should refine 3D mesh in box region", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        const originalVertexCount = mesh.nVertices;
+
+        // Refine in a corner of the cube
+        mesh.setSizeBox([0, 0, 0], [0.3, 0.3, 0.3], 0.1);
+        expect(mesh.localSizeCount).toBe(1);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+        expect(result.nVertices).toBeGreaterThan(originalVertexCount);
+      });
+
+      it("should refine 3D mesh in cylindrical region", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        const originalVertexCount = mesh.nVertices;
+
+        // Refine along a cylinder through the cube
+        mesh.setSizeCylinder([0, 0.5, 0.5], [1, 0.5, 0.5], 0.2, 0.1);
+        expect(mesh.localSizeCount).toBe(1);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+        expect(result.nVertices).toBeGreaterThan(originalVertexCount);
+      });
+
+      it("should refine 2D mesh in circular region", async () => {
+        const mesh = new Mesh({
+          vertices: squareVertices,
+          cells: squareTriangles,
+          boundaryFaces: squareEdges,
+        });
+        meshes.push(mesh);
+
+        const originalVertexCount = mesh.nVertices;
+
+        // Refine around center of square
+        mesh.setSizeCircle([0.5, 0.5], 0.3, 0.1);
+        expect(mesh.localSizeCount).toBe(1);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+        expect(result.nVertices).toBeGreaterThan(originalVertexCount);
+      });
+
+      it("should refine 2D mesh in box region", async () => {
+        const mesh = new Mesh({
+          vertices: squareVertices,
+          cells: squareTriangles,
+          boundaryFaces: squareEdges,
+        });
+        meshes.push(mesh);
+
+        const originalVertexCount = mesh.nVertices;
+
+        // Refine in a corner of the square
+        mesh.setSizeBox([0, 0], [0.3, 0.3], 0.1);
+        expect(mesh.localSizeCount).toBe(1);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+        expect(result.nVertices).toBeGreaterThan(originalVertexCount);
+      });
+
+      it("should combine multiple constraints", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        // Add multiple refinement regions
+        mesh
+          .setSizeSphere([0.5, 0.5, 0.5], 0.2, 0.1)
+          .setSizeBox([0.8, 0.8, 0.8], [1, 1, 1], 0.08);
+
+        expect(mesh.localSizeCount).toBe(2);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+      });
+
+      it("should support method chaining", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        // Fluent API should work
+        const returned = mesh
+          .setSizeSphere([0.5, 0.5, 0.5], 0.2, 0.1)
+          .setSizeBox([0, 0, 0], [0.3, 0.3, 0.3], 0.15)
+          .setSizeCylinder([0, 0.5, 0.5], [1, 0.5, 0.5], 0.1, 0.12);
+
+        expect(returned).toBe(mesh);
+        expect(mesh.localSizeCount).toBe(3);
+      });
+
+      it("should clear local sizes", () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        mesh.setSizeSphere([0.5, 0.5, 0.5], 0.2, 0.1);
+        expect(mesh.localSizeCount).toBe(1);
+
+        mesh.clearLocalSizes();
+        expect(mesh.localSizeCount).toBe(0);
+      });
+
+      it("should throw for setSizeSphere on 2D mesh", () => {
+        const mesh = new Mesh({
+          vertices: squareVertices,
+          cells: squareTriangles,
+        });
+        meshes.push(mesh);
+
+        expect(() => mesh.setSizeSphere([0.5, 0.5, 0.5], 0.2, 0.1)).toThrow(
+          /only available for 3D meshes/,
+        );
+      });
+
+      it("should throw for setSizeCircle on 3D mesh", () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+        });
+        meshes.push(mesh);
+
+        expect(() => mesh.setSizeCircle([0.5, 0.5], 0.2, 0.1)).toThrow(
+          /only available for 2D meshes/,
+        );
+      });
+
+      it("should throw for setSizeCylinder on 2D mesh", () => {
+        const mesh = new Mesh({
+          vertices: squareVertices,
+          cells: squareTriangles,
+        });
+        meshes.push(mesh);
+
+        expect(() =>
+          mesh.setSizeCylinder([0, 0, 0], [1, 0, 0], 0.2, 0.1),
+        ).toThrow(/only available for 3D meshes/);
+      });
+
+      it("should throw for wrong dimension box on 3D mesh", () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+        });
+        meshes.push(mesh);
+
+        expect(() =>
+          mesh.setSizeBox([0, 0] as [number, number], [1, 1] as [number, number], 0.1),
+        ).toThrow(/must have 3 dimensions/);
+      });
+
+      it("should throw for wrong dimension box on 2D mesh", () => {
+        const mesh = new Mesh({
+          vertices: squareVertices,
+          cells: squareTriangles,
+        });
+        meshes.push(mesh);
+
+        expect(() =>
+          mesh.setSizeBox(
+            [0, 0, 0] as [number, number, number],
+            [1, 1, 1] as [number, number, number],
+            0.1,
+          ),
+        ).toThrow(/must have 2 dimensions/);
+      });
+
+      it("should throw for invalid sphere parameters", () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+        });
+        meshes.push(mesh);
+
+        expect(() => mesh.setSizeSphere([0.5, 0.5, 0.5], -1, 0.1)).toThrow(
+          /radius must be positive/,
+        );
+        expect(() => mesh.setSizeSphere([0.5, 0.5, 0.5], 0.2, -0.1)).toThrow(
+          /size must be positive/,
+        );
+      });
+
+      it("should throw for invalid box parameters", () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+        });
+        meshes.push(mesh);
+
+        expect(() =>
+          mesh.setSizeBox([0.5, 0.5, 0.5], [0.3, 0.3, 0.3], 0.1),
+        ).toThrow(/min must be less than max/);
+      });
+
+      it("should throw for local sizing after dispose", () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+        });
+
+        mesh.free();
+
+        expect(() => mesh.setSizeSphere([0.5, 0.5, 0.5], 0.2, 0.1)).toThrow(
+          /disposed/,
+        );
+      });
+
+      it("should work with surface mesh", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTriangles,
+          type: MeshType.MeshS,
+        });
+        meshes.push(mesh);
+
+        const originalVertexCount = mesh.nVertices;
+
+        mesh.setSizeSphere([0.5, 0.5, 0.5], 0.3, 0.1);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+        expect(result.nVertices).toBeGreaterThan(originalVertexCount);
+      });
+    });
   });
 });
