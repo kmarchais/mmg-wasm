@@ -146,6 +146,13 @@ interface MmgModule {
   _mmg3d_free_array: (ptr: number) => void;
   _mmg3d_load_mesh: (handle: number, filenamePtr: number) => number;
   _mmg3d_save_mesh: (handle: number, filenamePtr: number) => number;
+  // Quality functions
+  _mmg2d_get_triangle_quality: (handle: number, k: number) => number;
+  _mmg2d_get_triangles_qualities: (handle: number, outCountPtr: number) => number;
+  _mmgs_get_triangle_quality: (handle: number, k: number) => number;
+  _mmgs_get_triangles_qualities: (handle: number, outCountPtr: number) => number;
+  _mmg3d_get_tetrahedron_quality: (handle: number, k: number) => number;
+  _mmg3d_get_tetrahedra_qualities: (handle: number, outCountPtr: number) => number;
   // String helpers
   lengthBytesUTF8: (str: string) => number;
   stringToUTF8: (str: string, ptr: number, maxBytes: number) => void;
@@ -282,7 +289,26 @@ export function useMmgWasm() {
     []
   );
 
-  return { isLoaded, remesh, loadMeshFile, saveMeshFile };
+  const computeQuality = useCallback(
+    async (
+      meshType: MeshType,
+      mesh: MeshData
+    ): Promise<Float64Array> => {
+      const Module = moduleRef.current;
+      if (!Module) throw new Error("WASM module not loaded");
+
+      if (meshType === "mmg2d") {
+        return computeQuality2D(Module, mesh);
+      } else if (meshType === "mmgs") {
+        return computeQualityS(Module, mesh);
+      } else {
+        return computeQuality3D(Module, mesh);
+      }
+    },
+    []
+  );
+
+  return { isLoaded, remesh, loadMeshFile, saveMeshFile, computeQuality };
 }
 
 // Helper functions for memory management
@@ -423,11 +449,27 @@ async function remesh2D(
       Module._mmg2d_free_array(outEdgePtr);
     }
 
+    // Get quality
+    let outQuality = new Float64Array(0);
+    if (triCount > 0) {
+      const qualCountPtr = Module._malloc(4);
+      const qualPtr = Module._mmg2d_get_triangles_qualities(handle, qualCountPtr);
+      const qualCount = Module.getValue(qualCountPtr, "i32");
+      Module._free(qualCountPtr);
+
+      if (qualPtr && qualCount > 0) {
+        outQuality = new Float64Array(qualCount);
+        outQuality.set(Module.HEAPF64.subarray(qualPtr / 8, qualPtr / 8 + qualCount));
+        Module._mmg2d_free_array(qualPtr);
+      }
+    }
+
     return {
       mesh: {
         vertices: outVertices,
         triangles: outTriangles,
         edges: outEdges,
+        quality: outQuality,
       },
       stats: {
         nVertices: outNv,
@@ -547,11 +589,27 @@ async function remeshS(
       Module._mmgs_free_array(outEdgePtr);
     }
 
+    // Get quality
+    let outQuality = new Float64Array(0);
+    if (triCount > 0) {
+      const qualCountPtr = Module._malloc(4);
+      const qualPtr = Module._mmgs_get_triangles_qualities(handle, qualCountPtr);
+      const qualCount = Module.getValue(qualCountPtr, "i32");
+      Module._free(qualCountPtr);
+
+      if (qualPtr && qualCount > 0) {
+        outQuality = new Float64Array(qualCount);
+        outQuality.set(Module.HEAPF64.subarray(qualPtr / 8, qualPtr / 8 + qualCount));
+        Module._mmgs_free_array(qualPtr);
+      }
+    }
+
     return {
       mesh: {
         vertices: outVertices,
         triangles: outTriangles,
         edges: outEdges,
+        quality: outQuality,
       },
       stats: {
         nVertices: outNv,
@@ -687,11 +745,27 @@ async function remesh3D(
       Module._mmg3d_free_array(outTriPtr);
     }
 
+    // Get quality (for tetrahedra)
+    let outQuality = new Float64Array(0);
+    if (tetraCount > 0) {
+      const qualCountPtr = Module._malloc(4);
+      const qualPtr = Module._mmg3d_get_tetrahedra_qualities(handle, qualCountPtr);
+      const qualCount = Module.getValue(qualCountPtr, "i32");
+      Module._free(qualCountPtr);
+
+      if (qualPtr && qualCount > 0) {
+        outQuality = new Float64Array(qualCount);
+        outQuality.set(Module.HEAPF64.subarray(qualPtr / 8, qualPtr / 8 + qualCount));
+        Module._mmg3d_free_array(qualPtr);
+      }
+    }
+
     return {
       mesh: {
         vertices: outVertices,
         triangles: outTriangles,
         tetrahedra: outTetrahedra,
+        quality: outQuality,
       },
       stats: {
         nVertices: outNv,
@@ -775,8 +849,23 @@ async function loadMesh2D(
       Module._mmg2d_free_array(edgePtr);
     }
 
+    // Get quality
+    let quality = new Float64Array(0);
+    if (triCount > 0) {
+      const qualCountPtr = Module._malloc(4);
+      const qualPtr = Module._mmg2d_get_triangles_qualities(handle, qualCountPtr);
+      const qualCount = Module.getValue(qualCountPtr, "i32");
+      Module._free(qualCountPtr);
+
+      if (qualPtr && qualCount > 0) {
+        quality = new Float64Array(qualCount);
+        quality.set(Module.HEAPF64.subarray(qualPtr / 8, qualPtr / 8 + qualCount));
+        Module._mmg2d_free_array(qualPtr);
+      }
+    }
+
     return {
-      mesh: { vertices, triangles, edges },
+      mesh: { vertices, triangles, edges, quality },
       stats: { nVertices: nv, nTriangles: nt, nEdges: ne, nTetrahedra: 0 },
     };
   } finally {
@@ -847,8 +936,23 @@ async function loadMeshS(
       Module._mmgs_free_array(edgePtr);
     }
 
+    // Get quality
+    let quality = new Float64Array(0);
+    if (triCount > 0) {
+      const qualCountPtr = Module._malloc(4);
+      const qualPtr = Module._mmgs_get_triangles_qualities(handle, qualCountPtr);
+      const qualCount = Module.getValue(qualCountPtr, "i32");
+      Module._free(qualCountPtr);
+
+      if (qualPtr && qualCount > 0) {
+        quality = new Float64Array(qualCount);
+        quality.set(Module.HEAPF64.subarray(qualPtr / 8, qualPtr / 8 + qualCount));
+        Module._mmgs_free_array(qualPtr);
+      }
+    }
+
     return {
-      mesh: { vertices, triangles, edges },
+      mesh: { vertices, triangles, edges, quality },
       stats: { nVertices: nv, nTriangles: nt, nEdges: ne, nTetrahedra: 0 },
     };
   } finally {
@@ -927,8 +1031,23 @@ async function loadMesh3D(
       Module._mmg3d_free_array(triPtr);
     }
 
+    // Get quality (for tetrahedra)
+    let quality = new Float64Array(0);
+    if (tetraCount > 0) {
+      const qualCountPtr = Module._malloc(4);
+      const qualPtr = Module._mmg3d_get_tetrahedra_qualities(handle, qualCountPtr);
+      const qualCount = Module.getValue(qualCountPtr, "i32");
+      Module._free(qualCountPtr);
+
+      if (qualPtr && qualCount > 0) {
+        quality = new Float64Array(qualCount);
+        quality.set(Module.HEAPF64.subarray(qualPtr / 8, qualPtr / 8 + qualCount));
+        Module._mmg3d_free_array(qualPtr);
+      }
+    }
+
     return {
-      mesh: { vertices, triangles, tetrahedra },
+      mesh: { vertices, triangles, tetrahedra, quality },
       stats: { nVertices: nv, nTriangles: nt, nTetrahedra: ne, nEdges: 0 },
     };
   } finally {
@@ -1072,6 +1191,172 @@ async function saveMesh3D(
     result = Module._mmg3d_save_mesh(handle, filenamePtr);
     Module._free(filenamePtr);
     if (result !== 1) throw new Error("Failed to save mesh");
+  } finally {
+    Module._mmg3d_free(handle);
+  }
+}
+
+// Quality computation functions
+async function computeQuality2D(
+  Module: MmgModule,
+  mesh: MeshData
+): Promise<Float64Array> {
+  const nVertices = mesh.vertices.length / 2;
+  const nTriangles = mesh.triangles ? mesh.triangles.length / 3 : 0;
+  const nEdges = mesh.edges ? mesh.edges.length / 2 : 0;
+
+  if (nTriangles === 0) return new Float64Array(0);
+
+  const handle = Module._mmg2d_init();
+  if (handle < 0) throw new Error("Failed to initialize MMG2D");
+
+  try {
+    let result = Module._mmg2d_set_mesh_size(handle, nVertices, nTriangles, 0, nEdges);
+    if (result !== 1) throw new Error("Failed to set mesh size");
+
+    const vertPtr = allocFloat64(Module, mesh.vertices);
+    result = Module._mmg2d_set_vertices(handle, vertPtr, 0);
+    Module._free(vertPtr);
+    if (result !== 1) throw new Error("Failed to set vertices");
+
+    if (mesh.triangles) {
+      const triPtr = allocInt32(Module, mesh.triangles);
+      result = Module._mmg2d_set_triangles(handle, triPtr, 0);
+      Module._free(triPtr);
+      if (result !== 1) throw new Error("Failed to set triangles");
+    }
+
+    if (mesh.edges && nEdges > 0) {
+      const edgePtr = allocInt32(Module, mesh.edges);
+      result = Module._mmg2d_set_edges(handle, edgePtr, 0);
+      Module._free(edgePtr);
+    }
+
+    // Get qualities
+    const countPtr = Module._malloc(4);
+    const qualPtr = Module._mmg2d_get_triangles_qualities(handle, countPtr);
+    const count = Module.getValue(countPtr, "i32");
+    Module._free(countPtr);
+
+    if (qualPtr === 0 || count === 0) {
+      return new Float64Array(0);
+    }
+
+    const qualities = new Float64Array(count);
+    qualities.set(Module.HEAPF64.subarray(qualPtr / 8, qualPtr / 8 + count));
+    Module._mmg2d_free_array(qualPtr);
+
+    return qualities;
+  } finally {
+    Module._mmg2d_free(handle);
+  }
+}
+
+async function computeQualityS(
+  Module: MmgModule,
+  mesh: MeshData
+): Promise<Float64Array> {
+  const nVertices = mesh.vertices.length / 3;
+  const nTriangles = mesh.triangles ? mesh.triangles.length / 3 : 0;
+  const nEdges = mesh.edges ? mesh.edges.length / 2 : 0;
+
+  if (nTriangles === 0) return new Float64Array(0);
+
+  const handle = Module._mmgs_init();
+  if (handle < 0) throw new Error("Failed to initialize MMGS");
+
+  try {
+    let result = Module._mmgs_set_mesh_size(handle, nVertices, nTriangles, nEdges);
+    if (result !== 1) throw new Error("Failed to set mesh size");
+
+    const vertPtr = allocFloat64(Module, mesh.vertices);
+    result = Module._mmgs_set_vertices(handle, vertPtr, 0);
+    Module._free(vertPtr);
+    if (result !== 1) throw new Error("Failed to set vertices");
+
+    if (mesh.triangles) {
+      const triPtr = allocInt32(Module, mesh.triangles);
+      result = Module._mmgs_set_triangles(handle, triPtr, 0);
+      Module._free(triPtr);
+      if (result !== 1) throw new Error("Failed to set triangles");
+    }
+
+    if (mesh.edges && nEdges > 0) {
+      const edgePtr = allocInt32(Module, mesh.edges);
+      result = Module._mmgs_set_edges(handle, edgePtr, 0);
+      Module._free(edgePtr);
+    }
+
+    // Get qualities
+    const countPtr = Module._malloc(4);
+    const qualPtr = Module._mmgs_get_triangles_qualities(handle, countPtr);
+    const count = Module.getValue(countPtr, "i32");
+    Module._free(countPtr);
+
+    if (qualPtr === 0 || count === 0) {
+      return new Float64Array(0);
+    }
+
+    const qualities = new Float64Array(count);
+    qualities.set(Module.HEAPF64.subarray(qualPtr / 8, qualPtr / 8 + count));
+    Module._mmgs_free_array(qualPtr);
+
+    return qualities;
+  } finally {
+    Module._mmgs_free(handle);
+  }
+}
+
+async function computeQuality3D(
+  Module: MmgModule,
+  mesh: MeshData
+): Promise<Float64Array> {
+  const nVertices = mesh.vertices.length / 3;
+  const nTetrahedra = mesh.tetrahedra ? mesh.tetrahedra.length / 4 : 0;
+  const nTriangles = mesh.triangles ? mesh.triangles.length / 3 : 0;
+
+  if (nTetrahedra === 0) return new Float64Array(0);
+
+  const handle = Module._mmg3d_init();
+  if (handle < 0) throw new Error("Failed to initialize MMG3D");
+
+  try {
+    let result = Module._mmg3d_set_mesh_size(handle, nVertices, nTetrahedra, 0, nTriangles, 0, 0);
+    if (result !== 1) throw new Error("Failed to set mesh size");
+
+    const vertPtr = allocFloat64(Module, mesh.vertices);
+    result = Module._mmg3d_set_vertices(handle, vertPtr, 0);
+    Module._free(vertPtr);
+    if (result !== 1) throw new Error("Failed to set vertices");
+
+    if (mesh.tetrahedra) {
+      const tetraPtr = allocInt32(Module, mesh.tetrahedra);
+      result = Module._mmg3d_set_tetrahedra(handle, tetraPtr, 0);
+      Module._free(tetraPtr);
+      if (result !== 1) throw new Error("Failed to set tetrahedra");
+    }
+
+    if (mesh.triangles && nTriangles > 0) {
+      const triPtr = allocInt32(Module, mesh.triangles);
+      result = Module._mmg3d_set_triangles(handle, triPtr, 0);
+      Module._free(triPtr);
+    }
+
+    // Get qualities
+    const countPtr = Module._malloc(4);
+    const qualPtr = Module._mmg3d_get_tetrahedra_qualities(handle, countPtr);
+    const count = Module.getValue(countPtr, "i32");
+    Module._free(countPtr);
+
+    if (qualPtr === 0 || count === 0) {
+      return new Float64Array(0);
+    }
+
+    const qualities = new Float64Array(count);
+    qualities.set(Module.HEAPF64.subarray(qualPtr / 8, qualPtr / 8 + count));
+    Module._mmg3d_free_array(qualPtr);
+
+    return qualities;
   } finally {
     Module._mmg3d_free(handle);
   }

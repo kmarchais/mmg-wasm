@@ -1,29 +1,22 @@
 import { useEffect, useRef, useMemo } from "react";
 import { useMeshStore } from "@/stores/meshStore";
 import type { MeshData } from "@/types/mesh";
-import { computeTriangleQuality, getMetricRange } from "@/utils/meshQuality";
+import { getMetricRange } from "@/utils/meshQuality";
 import { getColor } from "@/utils/colorMapping";
 
 interface MeshViewer2DProps {
   mesh: MeshData | null;
-  label: string;
 }
 
-export function MeshViewer2D({ mesh, label }: MeshViewer2DProps) {
+export function MeshViewer2D({ mesh }: MeshViewer2DProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { viewerOptions } = useMeshStore();
+  const { viewerOptions, theme } = useMeshStore();
 
-  // Compute quality if a metric is selected
+  // Use stored quality from mesh data
   const qualityData = useMemo(() => {
-    if (!mesh?.triangles || !viewerOptions.qualityMetric) return null;
-    const quality = computeTriangleQuality(
-      mesh.vertices,
-      mesh.triangles,
-      viewerOptions.qualityMetric,
-      2
-    );
-    const range = getMetricRange(quality);
-    return { quality, ...range };
+    if (!mesh?.quality || mesh.quality.length === 0 || !viewerOptions.qualityMetric) return null;
+    const range = getMetricRange(mesh.quality);
+    return { quality: mesh.quality, ...range };
   }, [mesh, viewerOptions.qualityMetric]);
 
   useEffect(() => {
@@ -76,8 +69,8 @@ export function MeshViewer2D({ mesh, label }: MeshViewer2DProps) {
     const transformX = (x: number) => offsetX + x * scale;
     const transformY = (y: number) => height - (offsetY + y * scale);
 
-    // Clear canvas
-    ctx.fillStyle = "#f8f9fa";
+    // Clear canvas with theme-appropriate background
+    ctx.fillStyle = theme === "dark" ? "#1f2937" : "#f8f9fa";
     ctx.fillRect(0, 0, width, height);
 
     const triangles = mesh.triangles;
@@ -110,7 +103,7 @@ export function MeshViewer2D({ mesh, label }: MeshViewer2DProps) {
 
       // Draw wireframe
       if (viewerOptions.showWireframe) {
-        ctx.strokeStyle = "#0066cc";
+        ctx.strokeStyle = theme === "dark" ? "#a0a0a0" : "#000000";
         ctx.lineWidth = 1;
 
         for (let i = 0; i < nTris; i++) {
@@ -144,24 +137,21 @@ export function MeshViewer2D({ mesh, label }: MeshViewer2DProps) {
         ctx.fill();
       }
     }
-  }, [mesh, viewerOptions, qualityData]);
+  }, [mesh, viewerOptions, qualityData, theme]);
 
   return (
-    <div className="flex flex-col h-full">
-      <p className="text-sm font-medium text-gray-600 mb-2">{label}</p>
-      <div className="viewer-container flex-1 min-h-[200px]">
-        {mesh ? (
-          <canvas
-            ref={canvasRef}
-            className="w-full h-full"
-            style={{ display: "block" }}
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full text-gray-400">
-            No mesh data
-          </div>
-        )}
-      </div>
+    <div className="viewer-container h-full">
+      {mesh ? (
+        <canvas
+          ref={canvasRef}
+          className="w-full h-full"
+          style={{ display: "block" }}
+        />
+      ) : (
+        <div className="flex items-center justify-center h-full text-gray-400">
+          No mesh data
+        </div>
+      )}
     </div>
   );
 }

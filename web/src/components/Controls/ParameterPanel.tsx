@@ -5,10 +5,15 @@ interface ParameterConfig {
   key: keyof RemeshParams;
   label: string;
   description: string;
-  min: number;
-  max: number;
-  step: number;
-  default?: number;
+  // These are relative to mesh scale (multipliers)
+  minRatio: number;
+  maxRatio: number;
+  defaultRatio: number;
+  // hgrad is absolute, not relative to scale
+  absolute?: boolean;
+  absoluteMin?: number;
+  absoluteMax?: number;
+  absoluteDefault?: number;
 }
 
 const parameterConfigs: Record<MeshType, ParameterConfig[]> = {
@@ -17,42 +22,45 @@ const parameterConfigs: Record<MeshType, ParameterConfig[]> = {
       key: "hmax",
       label: "hmax",
       description: "Maximum edge length",
-      min: 0.01,
-      max: 1.0,
-      step: 0.01,
-      default: 0.15,
+      minRatio: 0.01,
+      maxRatio: 0.5,
+      defaultRatio: 0.1,
     },
     {
       key: "hmin",
       label: "hmin",
       description: "Minimum edge length",
-      min: 0.001,
-      max: 0.5,
-      step: 0.001,
+      minRatio: 0.001,
+      maxRatio: 0.2,
+      defaultRatio: 0.01,
     },
     {
       key: "hsiz",
       label: "hsiz",
       description: "Constant edge length",
-      min: 0.01,
-      max: 1.0,
-      step: 0.01,
+      minRatio: 0.01,
+      maxRatio: 0.5,
+      defaultRatio: 0.1,
     },
     {
       key: "hausd",
       label: "hausd",
       description: "Hausdorff distance",
-      min: 0.001,
-      max: 0.5,
-      step: 0.001,
+      minRatio: 0.001,
+      maxRatio: 0.2,
+      defaultRatio: 0.01,
     },
     {
       key: "hgrad",
       label: "hgrad",
       description: "Gradation parameter",
-      min: 1.0,
-      max: 3.0,
-      step: 0.1,
+      minRatio: 0,
+      maxRatio: 0,
+      defaultRatio: 0,
+      absolute: true,
+      absoluteMin: 1.0,
+      absoluteMax: 3.0,
+      absoluteDefault: 1.3,
     },
   ],
   mmgs: [
@@ -60,42 +68,45 @@ const parameterConfigs: Record<MeshType, ParameterConfig[]> = {
       key: "hmax",
       label: "hmax",
       description: "Maximum edge length",
-      min: 0.05,
-      max: 1.0,
-      step: 0.01,
-      default: 0.25,
+      minRatio: 0.01,
+      maxRatio: 0.5,
+      defaultRatio: 0.15,
     },
     {
       key: "hmin",
       label: "hmin",
       description: "Minimum edge length",
-      min: 0.001,
-      max: 0.5,
-      step: 0.001,
+      minRatio: 0.001,
+      maxRatio: 0.2,
+      defaultRatio: 0.01,
     },
     {
       key: "hsiz",
       label: "hsiz",
       description: "Constant edge length",
-      min: 0.01,
-      max: 1.0,
-      step: 0.01,
+      minRatio: 0.01,
+      maxRatio: 0.5,
+      defaultRatio: 0.1,
     },
     {
       key: "hausd",
       label: "hausd",
       description: "Hausdorff distance",
-      min: 0.001,
-      max: 0.5,
-      step: 0.001,
+      minRatio: 0.001,
+      maxRatio: 0.2,
+      defaultRatio: 0.01,
     },
     {
       key: "hgrad",
       label: "hgrad",
       description: "Gradation parameter",
-      min: 1.0,
-      max: 3.0,
-      step: 0.1,
+      minRatio: 0,
+      maxRatio: 0,
+      defaultRatio: 0,
+      absolute: true,
+      absoluteMin: 1.0,
+      absoluteMax: 3.0,
+      absoluteDefault: 1.3,
     },
   ],
   mmg3d: [
@@ -103,45 +114,66 @@ const parameterConfigs: Record<MeshType, ParameterConfig[]> = {
       key: "hmax",
       label: "hmax",
       description: "Maximum edge length",
-      min: 0.05,
-      max: 2.0,
-      step: 0.05,
-      default: 0.3,
+      minRatio: 0.01,
+      maxRatio: 0.5,
+      defaultRatio: 0.2,
     },
     {
       key: "hmin",
       label: "hmin",
       description: "Minimum edge length",
-      min: 0.001,
-      max: 0.5,
-      step: 0.001,
+      minRatio: 0.001,
+      maxRatio: 0.2,
+      defaultRatio: 0.01,
     },
     {
       key: "hsiz",
       label: "hsiz",
       description: "Constant edge length",
-      min: 0.01,
-      max: 1.0,
-      step: 0.01,
+      minRatio: 0.01,
+      maxRatio: 0.5,
+      defaultRatio: 0.1,
     },
     {
       key: "hausd",
       label: "hausd",
       description: "Hausdorff distance",
-      min: 0.001,
-      max: 0.5,
-      step: 0.001,
+      minRatio: 0.001,
+      maxRatio: 0.2,
+      defaultRatio: 0.01,
     },
     {
       key: "hgrad",
       label: "hgrad",
       description: "Gradation parameter",
-      min: 1.0,
-      max: 3.0,
-      step: 0.1,
+      minRatio: 0,
+      maxRatio: 0,
+      defaultRatio: 0,
+      absolute: true,
+      absoluteMin: 1.0,
+      absoluteMax: 3.0,
+      absoluteDefault: 1.3,
     },
   ],
 };
+
+function getScaledConfig(config: ParameterConfig, scale: number) {
+  if (config.absolute) {
+    return {
+      min: config.absoluteMin!,
+      max: config.absoluteMax!,
+      default: config.absoluteDefault!,
+      step: 0.1,
+    };
+  }
+  const min = config.minRatio * scale;
+  const max = config.maxRatio * scale;
+  const defaultVal = config.defaultRatio * scale;
+  // Compute a sensible step based on the range
+  const range = max - min;
+  const step = Math.pow(10, Math.floor(Math.log10(range / 100)));
+  return { min, max, default: defaultVal, step };
+}
 
 interface ParameterPanelProps {
   meshType: MeshType;
@@ -154,9 +186,10 @@ export function ParameterPanel({
   onRemesh,
   disabled,
 }: ParameterPanelProps) {
-  const { params, setParams, liveRemesh, setLiveRemesh } = useMeshStore();
+  const { params, setParams, liveRemesh, setLiveRemesh, meshData } = useMeshStore();
   const currentParams = params[meshType];
   const configs = parameterConfigs[meshType];
+  const meshScale = meshData[meshType].scale;
 
   const handleParamChange = (key: keyof RemeshParams, value: number | undefined) => {
     setParams(meshType, { [key]: value });
@@ -170,6 +203,7 @@ export function ParameterPanel({
         {configs.map((config) => {
           const value = currentParams[config.key];
           const isActive = value !== undefined;
+          const scaled = getScaledConfig(config, meshScale);
 
           return (
             <div key={config.key} className="space-y-1">
@@ -180,18 +214,18 @@ export function ParameterPanel({
                     checked={isActive}
                     onChange={(e) => {
                       if (e.target.checked) {
-                        handleParamChange(config.key, config.default ?? config.min);
+                        handleParamChange(config.key, scaled.default);
                       } else {
                         handleParamChange(config.key, undefined);
                       }
                     }}
-                    className="rounded border-gray-300"
+                    className="rounded border-gray-300 dark:border-gray-600"
                     disabled={disabled}
                   />
                   <span className="font-mono">{config.label}</span>
                 </label>
                 {isActive && (
-                  <span className="text-sm font-mono text-gray-600">
+                  <span className="text-sm font-mono text-gray-600 dark:text-gray-400">
                     {value?.toFixed(3)}
                   </span>
                 )}
@@ -199,10 +233,10 @@ export function ParameterPanel({
               {isActive && (
                 <input
                   type="range"
-                  min={config.min}
-                  max={config.max}
-                  step={config.step}
-                  value={value ?? config.default ?? config.min}
+                  min={scaled.min}
+                  max={scaled.max}
+                  step={scaled.step}
+                  value={value ?? scaled.default}
                   onChange={(e) =>
                     handleParamChange(config.key, parseFloat(e.target.value))
                   }
@@ -210,22 +244,22 @@ export function ParameterPanel({
                   disabled={disabled}
                 />
               )}
-              <p className="text-xs text-gray-500">{config.description}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{config.description}</p>
             </div>
           );
         })}
       </div>
 
-      <div className="mt-4 pt-4 border-t border-gray-200">
+      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
             checked={liveRemesh}
             onChange={(e) => setLiveRemesh(e.target.checked)}
-            className="rounded border-gray-300"
+            className="rounded border-gray-300 dark:border-gray-600"
             disabled={disabled}
           />
-          <span className="text-sm text-gray-700">
+          <span className="text-sm text-gray-700 dark:text-gray-300">
             Live remesh (update while dragging)
           </span>
         </label>

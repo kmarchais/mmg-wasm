@@ -32,7 +32,7 @@ export function StatusBar() {
   };
 
   return (
-    <div className="bg-white border-t border-gray-200 px-6 py-2">
+    <div className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-6 py-2">
       <div className="flex items-center justify-between">
         <span className={getStatusBadgeClass()}>
           {(wasmStatus === "loading" || isRemeshing) && (

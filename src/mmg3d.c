@@ -812,3 +812,67 @@ int mmg3d_save_sol(int handle, const char* filename) {
     }
     return MMG3D_saveSol(g_handles[handle].mesh, g_handles[handle].sol, filename);
 }
+
+/**
+ * Get the quality of a single tetrahedron.
+ * @param handle - The mesh handle
+ * @param k - The tetrahedron index (1-indexed, MMG convention)
+ * @returns Quality value between 0 (degenerate) and 1 (best), or 0 on failure
+ */
+EMSCRIPTEN_KEEPALIVE
+double mmg3d_get_tetrahedron_quality(int handle, int k) {
+    if (!validate_handle(handle)) {
+        return 0.0;
+    }
+    return MMG3D_Get_tetrahedronQuality(
+        g_handles[handle].mesh,
+        g_handles[handle].sol,
+        (MMG5_int)k
+    );
+}
+
+/**
+ * Get quality values for all tetrahedra.
+ * Allocates and returns a pointer to the quality array.
+ * out_count receives the number of tetrahedra.
+ * Caller must free the returned pointer using mmg3d_free_array.
+ * Returns NULL on failure.
+ */
+EMSCRIPTEN_KEEPALIVE
+double* mmg3d_get_tetrahedra_qualities(int handle, int* out_count) {
+    if (!validate_handle(handle)) {
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    MMG5_int np, ne, nprism, nt, nquad, na;
+    if (MMG3D_Get_meshSize(g_handles[handle].mesh, &np, &ne, &nprism, &nt, &nquad, &na) != 1) {
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    if (ne == 0) {
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    /* Allocate output array */
+    double* qualities = (double*)malloc(ne * sizeof(double));
+    if (!qualities) {
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    /* Get quality for each tetrahedron (1-indexed) */
+    for (MMG5_int k = 1; k <= ne; k++) {
+        qualities[k - 1] = MMG3D_Get_tetrahedronQuality(
+            g_handles[handle].mesh,
+            g_handles[handle].sol,
+            k
+        );
+    }
+
+    if (out_count) *out_count = (int)ne;
+    return qualities;
+}
+

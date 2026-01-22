@@ -1,8 +1,8 @@
 import { useMeshStore } from "@/stores/meshStore";
-import type { ColormapName, QualityMetric } from "@/types/mesh";
+import type { ColormapName, QualityMetric, MeshType } from "@/types/mesh";
 
 const colormaps: { id: ColormapName; label: string }[] = [
-  { id: "RdYlBu_r", label: "RdYlBu (reversed)" },
+  { id: "RdYlBu", label: "RdYlBu" },
   { id: "viridis", label: "Viridis" },
   { id: "plasma", label: "Plasma" },
   { id: "coolwarm", label: "Coolwarm" },
@@ -10,19 +10,21 @@ const colormaps: { id: ColormapName; label: string }[] = [
 ];
 
 const qualityMetrics: { id: QualityMetric; label: string }[] = [
-  { id: "aspectRatio", label: "Aspect Ratio" },
-  { id: "minAngle", label: "Min Angle" },
-  { id: "maxAngle", label: "Max Angle" },
-  { id: "edgeLength", label: "Edge Length" },
-  { id: "area", label: "Area" },
+  { id: "mmgQuality", label: "MMG Quality" },
 ];
 
 interface ViewControlsProps {
   show3DControls?: boolean;
+  meshType?: MeshType;
 }
 
-export function ViewControls({ show3DControls = true }: ViewControlsProps) {
-  const { viewerOptions, setViewerOption } = useMeshStore();
+export function ViewControls({ show3DControls = true, meshType }: ViewControlsProps) {
+  const {
+    viewerOptions,
+    setViewerOption,
+    clippingPosition,
+    setClippingPosition,
+  } = useMeshStore();
 
   return (
     <div className="panel">
@@ -34,9 +36,9 @@ export function ViewControls({ show3DControls = true }: ViewControlsProps) {
             type="checkbox"
             checked={viewerOptions.showWireframe}
             onChange={(e) => setViewerOption("showWireframe", e.target.checked)}
-            className="rounded border-gray-300"
+            className="rounded border-gray-300 dark:border-gray-600"
           />
-          <span className="text-sm text-gray-700">Show wireframe</span>
+          <span className="text-sm text-gray-700 dark:text-gray-300">Show wireframe</span>
         </label>
 
         <label className="flex items-center gap-2 cursor-pointer">
@@ -44,9 +46,9 @@ export function ViewControls({ show3DControls = true }: ViewControlsProps) {
             type="checkbox"
             checked={viewerOptions.showVertices}
             onChange={(e) => setViewerOption("showVertices", e.target.checked)}
-            className="rounded border-gray-300"
+            className="rounded border-gray-300 dark:border-gray-600"
           />
-          <span className="text-sm text-gray-700">Show vertices</span>
+          <span className="text-sm text-gray-700 dark:text-gray-300">Show vertices</span>
         </label>
 
         {show3DControls && (
@@ -55,16 +57,16 @@ export function ViewControls({ show3DControls = true }: ViewControlsProps) {
               type="checkbox"
               checked={viewerOptions.showFaces}
               onChange={(e) => setViewerOption("showFaces", e.target.checked)}
-              className="rounded border-gray-300"
+              className="rounded border-gray-300 dark:border-gray-600"
             />
-            <span className="text-sm text-gray-700">Show faces</span>
+            <span className="text-sm text-gray-700 dark:text-gray-300">Show faces</span>
           </label>
         )}
       </div>
 
       {show3DControls && (
         <>
-          <div className="mt-4 pt-4 border-t border-gray-200">
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
             <label className="input-label">Quality Metric</label>
             <select
               value={viewerOptions.qualityMetric ?? ""}
@@ -74,7 +76,7 @@ export function ViewControls({ show3DControls = true }: ViewControlsProps) {
                   e.target.value ? (e.target.value as QualityMetric) : null
                 )
               }
-              className="w-full rounded-md border-gray-300 shadow-sm text-sm"
+              className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 shadow-sm text-sm"
             >
               <option value="">None</option>
               {qualityMetrics.map((m) => (
@@ -93,7 +95,7 @@ export function ViewControls({ show3DControls = true }: ViewControlsProps) {
                 onChange={(e) =>
                   setViewerOption("colormap", e.target.value as ColormapName)
                 }
-                className="w-full rounded-md border-gray-300 shadow-sm text-sm"
+                className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 shadow-sm text-sm"
               >
                 {colormaps.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -101,6 +103,21 @@ export function ViewControls({ show3DControls = true }: ViewControlsProps) {
                   </option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {meshType === "mmg3d" && (
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <label className="input-label">Clip position</label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={clippingPosition}
+                onChange={(e) => setClippingPosition(parseFloat(e.target.value))}
+                className="w-full"
+              />
             </div>
           )}
         </>

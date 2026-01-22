@@ -5,6 +5,7 @@ export interface MeshData {
   triangles?: Int32Array;
   tetrahedra?: Int32Array;
   edges?: Int32Array;
+  quality?: Float64Array;
   refs?: {
     vertices?: Int32Array;
     triangles?: Int32Array;
@@ -31,18 +32,13 @@ export interface RemeshParams {
 }
 
 export type ColormapName =
-  | "RdYlBu_r"
+  | "RdYlBu"
   | "viridis"
   | "plasma"
   | "coolwarm"
   | "jet";
 
-export type QualityMetric =
-  | "aspectRatio"
-  | "minAngle"
-  | "maxAngle"
-  | "edgeLength"
-  | "area";
+export type QualityMetric = "mmgQuality";
 
 export interface ViewerOptions {
   showWireframe: boolean;

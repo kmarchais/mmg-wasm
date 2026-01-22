@@ -1,11 +1,11 @@
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useLayoutEffect, useCallback, useRef } from "react";
 import { useMeshStore } from "@/stores/meshStore";
 import { useMmgWasm } from "@/hooks/useMmgWasm";
-import { Header, Tabs, StatusBar, PrivacyBanner } from "@/components/Layout";
-import { ParameterPanel, FileControls, ViewControls } from "@/components/Controls";
-import { MeshStats } from "@/components/Stats";
+import { Header, StatusBar, PrivacyBanner } from "@/components/Layout";
+import { ParameterPanel, ViewControls } from "@/components/Controls";
+import { MeshStatsOverlay } from "@/components/Stats";
 import { MeshViewer2D, MeshViewer3D, ColorBar } from "@/components/Viewer";
-import { computeTriangleQuality, getMetricRange } from "@/utils/meshQuality";
+import { getMetricRange, getMeshScale } from "@/utils/meshQuality";
 import type { MeshData, MeshStats as MeshStatsType } from "@/types/mesh";
 
 // Default test meshes
@@ -63,24 +63,47 @@ export default function App() {
     params,
     viewerOptions,
     liveRemesh,
+    theme,
+    showOriginalMesh,
     setMeshBefore,
     setMeshAfter,
     setIsRemeshing,
     setStatusMessage,
+    setShowOriginalMesh,
   } = useMeshStore();
 
-  const { isLoaded, remesh, loadMeshFile, saveMeshFile } = useMmgWasm();
+  const { isLoaded, remesh, loadMeshFile, saveMeshFile, computeQuality } = useMmgWasm();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Apply theme to document synchronously before paint
+  useLayoutEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+  }, [theme]);
 
   // Initialize default meshes when WASM is loaded
   useEffect(() => {
     if (isLoaded) {
-      setMeshBefore("mmg2d", squareMesh, squareStats);
-      setMeshBefore("mmgs", tetraMesh, tetraStats);
-      setMeshBefore("mmg3d", cubeMesh, cubeStats);
+      // Set initial meshes and compute their quality and scale
+      const initMeshes = async () => {
+        // MMG2D
+        const quality2d = await computeQuality("mmg2d", squareMesh);
+        const scale2d = getMeshScale(squareMesh, true);
+        setMeshBefore("mmg2d", { ...squareMesh, quality: quality2d }, squareStats, scale2d);
 
-      // Initial remesh
-      handleRemesh();
+        // MMGS
+        const qualityS = await computeQuality("mmgs", tetraMesh);
+        const scaleS = getMeshScale(tetraMesh, false);
+        setMeshBefore("mmgs", { ...tetraMesh, quality: qualityS }, tetraStats, scaleS);
+
+        // MMG3D
+        const quality3d = await computeQuality("mmg3d", cubeMesh);
+        const scale3d = getMeshScale(cubeMesh, false);
+        setMeshBefore("mmg3d", { ...cubeMesh, quality: quality3d }, cubeStats, scale3d);
+
+        // Initial remesh
+        handleRemesh();
+      };
+      initMeshes();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded]);
@@ -113,6 +136,7 @@ export default function App() {
     if (!inputMesh) return;
 
     setIsRemeshing(true);
+    setShowOriginalMesh(false);
     try {
       const result = await remesh(activeMeshType, inputMesh, params[activeMeshType]);
       setMeshAfter(activeMeshType, result.mesh, result.stats);
@@ -137,6 +161,7 @@ export default function App() {
     setMeshAfter,
     setIsRemeshing,
     setStatusMessage,
+    setShowOriginalMesh,
   ]);
 
   const handleFileLoad = useCallback(
@@ -146,7 +171,9 @@ export default function App() {
       setIsRemeshing(true);
       try {
         const result = await loadMeshFile(activeMeshType, file);
-        setMeshBefore(activeMeshType, result.mesh, result.stats);
+        const is2D = activeMeshType === "mmg2d";
+        const scale = getMeshScale(result.mesh, is2D);
+        setMeshBefore(activeMeshType, result.mesh, result.stats, scale);
         setStatusMessage({
           type: "success",
           message: `Loaded: ${file.name}`,
@@ -180,112 +207,108 @@ export default function App() {
     ]
   );
 
-  const handleExport = useCallback(
-    async (filename: string) => {
-      if (!isLoaded) return;
+  const handleExport = useCallback(async () => {
+    if (!isLoaded) return;
 
-      const currentData = meshData[activeMeshType];
-      const meshToExport = currentData.after ?? currentData.before;
-      if (!meshToExport) return;
+    const currentData = meshData[activeMeshType];
+    const meshToExport = currentData.after ?? currentData.before;
+    if (!meshToExport) return;
 
-      try {
-        const content = await saveMeshFile(activeMeshType, meshToExport, filename);
-        const blob = new Blob([content], { type: "application/octet-stream" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        a.click();
-        URL.revokeObjectURL(url);
-        setStatusMessage({
-          type: "success",
-          message: `Exported: ${filename}`,
-        });
-      } catch (err) {
-        setStatusMessage({
-          type: "error",
-          message: `Export failed: ${err instanceof Error ? err.message : "Unknown error"}`,
-        });
-      }
-    },
-    [isLoaded, activeMeshType, meshData, saveMeshFile, setStatusMessage]
-  );
+    const ext = ".mesh";
+    const prefix = activeMeshType === "mmg2d" ? "mesh2d" : activeMeshType === "mmgs" ? "surface" : "mesh3d";
+    const filename = `${prefix}_remeshed${ext}`;
+
+    try {
+      const content = await saveMeshFile(activeMeshType, meshToExport, filename);
+      const blob = new Blob([content], { type: "application/octet-stream" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      setStatusMessage({
+        type: "success",
+        message: `Exported: ${filename}`,
+      });
+    } catch (err) {
+      setStatusMessage({
+        type: "error",
+        message: `Export failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+      });
+    }
+  }, [isLoaded, activeMeshType, meshData, saveMeshFile, setStatusMessage]);
 
   const currentMeshData = meshData[activeMeshType];
   const is2D = activeMeshType === "mmg2d";
   const disabled = wasmStatus !== "ready";
 
-  // Compute quality range for color bar
+  // Determine which mesh to show
+  const displayMesh = showOriginalMesh
+    ? currentMeshData.before
+    : (currentMeshData.after ?? currentMeshData.before);
+  const displayStats = showOriginalMesh
+    ? currentMeshData.statsBefore
+    : (currentMeshData.statsAfter ?? currentMeshData.statsBefore);
+
+  // Get quality range for color bar from stored quality data
   const qualityRange = (() => {
-    const mesh = currentMeshData.after ?? currentMeshData.before;
-    if (!mesh?.triangles || !viewerOptions.qualityMetric) return null;
-    const quality = computeTriangleQuality(
-      mesh.vertices,
-      mesh.triangles,
-      viewerOptions.qualityMetric,
-      is2D ? 2 : 3
-    );
-    return getMetricRange(quality);
+    if (!displayMesh?.quality || displayMesh.quality.length === 0 || !viewerOptions.qualityMetric) return null;
+    return getMetricRange(displayMesh.quality);
   })();
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      <Header />
-      <Tabs />
+    <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-950 overflow-hidden">
+      <Header
+        onFileLoad={handleFileLoad}
+        onExport={handleExport}
+        disabled={disabled}
+      />
       <PrivacyBanner />
 
-      <main className="flex-1 overflow-auto p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
-          {/* Left panel - controls */}
-          <div className="lg:col-span-1 space-y-4">
-            <ParameterPanel
-              meshType={activeMeshType}
-              onRemesh={handleRemesh}
-              disabled={disabled}
-            />
-            <FileControls
-              meshType={activeMeshType}
-              onFileLoad={handleFileLoad}
-              onExport={handleExport}
-              meshData={currentMeshData.after ?? currentMeshData.before}
-              disabled={disabled}
-            />
-            <ViewControls show3DControls={!is2D} />
-            <MeshStats
-              meshType={activeMeshType}
-              statsBefore={currentMeshData.statsBefore}
-              statsAfter={currentMeshData.statsAfter}
-            />
-          </div>
+      <main className="flex-1 flex gap-4 p-4 min-h-0">
+        {/* Left panel - controls */}
+        <div className="w-72 flex-shrink-0 space-y-4 overflow-y-auto">
+          <ParameterPanel
+            meshType={activeMeshType}
+            onRemesh={handleRemesh}
+            disabled={disabled}
+          />
+          <ViewControls show3DControls={!is2D} meshType={activeMeshType} />
 
-          {/* Right panel - viewers */}
-          <div className="lg:col-span-3 flex flex-col gap-4">
-            {qualityRange && <ColorBar min={qualityRange.min} max={qualityRange.max} />}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0">
-              {is2D ? (
-                <>
-                  <MeshViewer2D
-                    mesh={currentMeshData.before}
-                    label="Before"
-                  />
-                  <MeshViewer2D
-                    mesh={currentMeshData.after}
-                    label="After"
-                  />
-                </>
-              ) : (
-                <>
-                  <MeshViewer3D
-                    mesh={currentMeshData.before}
-                    label="Before"
-                  />
-                  <MeshViewer3D
-                    mesh={currentMeshData.after}
-                    label="After"
-                  />
-                </>
-              )}
+          {/* Show original mesh toggle */}
+          {currentMeshData.after && (
+            <div className="panel">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showOriginalMesh}
+                  onChange={(e) => setShowOriginalMesh(e.target.checked)}
+                  className="rounded border-gray-300 dark:border-gray-600"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  Show original mesh
+                </span>
+              </label>
             </div>
+          )}
+        </div>
+
+        {/* Right panel - viewer */}
+        <div className="flex-1 flex flex-col min-h-0 min-w-0">
+          {qualityRange && <ColorBar min={qualityRange.min} max={qualityRange.max} />}
+          <div className="flex-1 relative min-h-0">
+            {is2D ? (
+              <MeshViewer2D mesh={displayMesh} />
+            ) : (
+              <MeshViewer3D mesh={displayMesh} />
+            )}
+            <MeshStatsOverlay meshType={activeMeshType} stats={displayStats} />
+            {showOriginalMesh && (
+              <div className="absolute top-2 left-2 bg-amber-500/90 text-white text-xs font-medium px-2 py-1 rounded">
+                Original
+              </div>
+            )}
           </div>
         </div>
       </main>

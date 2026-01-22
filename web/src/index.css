@@ -21,27 +21,31 @@
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
   }
+
+  .dark body {
+    @apply bg-gray-950 text-gray-100;
+  }
 }
 
 @layer components {
   .slider-track {
-    @apply h-2 w-full cursor-pointer appearance-none rounded-full bg-gray-200;
+    @apply h-2 w-full cursor-pointer appearance-none rounded-full bg-gray-200 dark:bg-gray-700;
   }
 
   .slider-track::-webkit-slider-thumb {
-    @apply h-5 w-5 cursor-pointer appearance-none rounded-full border-2 border-blue-600 bg-white shadow-md transition-transform hover:scale-110;
+    @apply h-5 w-5 cursor-pointer appearance-none rounded-full border-2 border-blue-600 bg-white shadow-md transition-transform hover:scale-110 dark:bg-gray-200;
   }
 
   .slider-track::-moz-range-thumb {
-    @apply h-5 w-5 cursor-pointer rounded-full border-2 border-blue-600 bg-white shadow-md transition-transform hover:scale-110;
+    @apply h-5 w-5 cursor-pointer rounded-full border-2 border-blue-600 bg-white shadow-md transition-transform hover:scale-110 dark:bg-gray-200;
   }
 
   .tab-button {
-    @apply rounded-t-lg border-b-2 border-transparent px-4 py-2 font-medium text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-700;
+    @apply rounded-t-lg border-b-2 border-transparent px-4 py-2 font-medium text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300;
   }
 
   .tab-button.active {
-    @apply border-blue-600 text-blue-600;
+    @apply border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400;
   }
 
   .status-badge {
@@ -49,43 +53,43 @@
   }
 
   .status-badge.loading {
-    @apply bg-yellow-100 text-yellow-800;
+    @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-200;
   }
 
   .status-badge.ready {
-    @apply bg-green-100 text-green-800;
+    @apply bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200;
   }
 
   .status-badge.error {
-    @apply bg-red-100 text-red-800;
+    @apply bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200;
   }
 
   .panel {
-    @apply rounded-lg bg-white p-4 shadow-sm;
+    @apply rounded-lg bg-white p-4 shadow-sm dark:bg-gray-900 dark:shadow-gray-950;
   }
 
   .panel-header {
-    @apply mb-3 text-lg font-semibold text-gray-800;
+    @apply mb-3 text-lg font-semibold text-gray-800 dark:text-gray-200;
   }
 
   .input-label {
-    @apply mb-1 block text-sm font-medium text-gray-700;
+    @apply mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300;
   }
 
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus:ring-offset-gray-900;
   }
 
   .btn-primary {
-    @apply bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500;
+    @apply bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600;
   }
 
   .btn-secondary {
-    @apply border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-gray-500;
+    @apply border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700;
   }
 
   .viewer-container {
-    @apply relative overflow-hidden rounded-lg border border-gray-200 bg-gray-100;
+    @apply relative overflow-hidden rounded-lg border border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800;
   }
 
   .stats-table {
@@ -93,11 +97,11 @@
   }
 
   .stats-table th {
-    @apply border-b border-gray-200 px-3 py-2 text-left font-medium text-gray-500;
+    @apply border-b border-gray-200 px-3 py-2 text-left font-medium text-gray-500 dark:border-gray-700 dark:text-gray-400;
   }
 
   .stats-table td {
-    @apply border-b border-gray-100 px-3 py-2 text-gray-900;
+    @apply border-b border-gray-100 px-3 py-2 text-gray-900 dark:border-gray-800 dark:text-gray-100;
   }
 
   .stats-table tr:last-child td {
@@ -105,6 +109,6 @@
   }
 
   .privacy-banner {
-    @apply flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800;
+    @apply flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200;
   }
 }

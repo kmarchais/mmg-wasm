@@ -4,18 +4,18 @@ import { Color } from "three";
 type RGB = [number, number, number];
 
 const colormaps: Record<ColormapName, RGB[]> = {
-  RdYlBu_r: [
-    [0.192, 0.212, 0.584],
-    [0.271, 0.459, 0.706],
-    [0.455, 0.678, 0.82],
-    [0.671, 0.851, 0.914],
-    [0.878, 0.953, 0.973],
-    [1.0, 1.0, 0.749],
-    [0.996, 0.878, 0.565],
-    [0.992, 0.682, 0.38],
-    [0.957, 0.427, 0.263],
-    [0.843, 0.188, 0.153],
+  RdYlBu: [
     [0.647, 0.0, 0.149],
+    [0.843, 0.188, 0.153],
+    [0.957, 0.427, 0.263],
+    [0.992, 0.682, 0.38],
+    [0.996, 0.878, 0.565],
+    [1.0, 1.0, 0.749],
+    [0.878, 0.953, 0.973],
+    [0.671, 0.851, 0.914],
+    [0.455, 0.678, 0.82],
+    [0.271, 0.459, 0.706],
+    [0.192, 0.212, 0.584],
   ],
   viridis: [
     [0.267, 0.004, 0.329],
@@ -95,7 +95,7 @@ export function getColor(
 ): Color {
   const range = max - min;
   const t = range > 0 ? (value - min) / range : 0.5;
-  const [r, g, b] = interpolateColor(colormaps[colormap], t);
+  const [r, g, b] = interpolateColor(colormaps[colormap] ?? colormaps.RdYlBu, t);
   return new Color(r, g, b);
 }
 
@@ -114,7 +114,7 @@ export function getColorArray(
   }
 
   const range = max - min;
-  const cmapColors = colormaps[colormap];
+  const cmapColors = colormaps[colormap] ?? colormaps.RdYlBu;
 
   for (let i = 0; i < values.length; i++) {
     const t = range > 0 ? (values[i]! - min) / range : 0.5;
@@ -128,7 +128,7 @@ export function getColorArray(
 }
 
 export function generateColorBarGradient(colormap: ColormapName): string {
-  const colors = colormaps[colormap];
+  const colors = colormaps[colormap] ?? colormaps.RdYlBu;
   const stops = colors
     .map((c, i) => {
       const percent = (i / (colors.length - 1)) * 100;
