@@ -48,7 +48,10 @@ describe("Memory Utilities", () => {
 
       try {
         // Read back the data directly from heap
-        const heapView = module.HEAPF64.subarray(ptr / 8, ptr / 8 + data.length);
+        const heapView = module.HEAPF64.subarray(
+          ptr / 8,
+          ptr / 8 + data.length,
+        );
         for (let i = 0; i < data.length; i++) {
           expect(heapView[i]).toBeCloseTo(data[i]);
         }
@@ -116,7 +119,11 @@ describe("Memory Utilities", () => {
 
       try {
         // Read back the data directly from heap using a Uint32Array view
-        const heapView = new Uint32Array(module.HEAPU8.buffer, ptr, data.length);
+        const heapView = new Uint32Array(
+          module.HEAPU8.buffer,
+          ptr,
+          data.length,
+        );
         for (let i = 0; i < data.length; i++) {
           expect(heapView[i]).toBe(data[i]);
         }
@@ -130,7 +137,11 @@ describe("Memory Utilities", () => {
       const ptr = toWasmUint32(module, data);
 
       try {
-        const heapView = new Uint32Array(module.HEAPU8.buffer, ptr, data.length);
+        const heapView = new Uint32Array(
+          module.HEAPU8.buffer,
+          ptr,
+          data.length,
+        );
         expect(heapView[0]).toBe(0);
         expect(heapView[1]).toBe(1);
         expect(heapView[2]).toBe(0xffffffff);
@@ -266,7 +277,11 @@ describe("Memory Utilities", () => {
         const result = fromWasmUint32(module, ptr, original.length);
 
         // Modify the heap data using a Uint32Array view
-        const heapView = new Uint32Array(module.HEAPU8.buffer, ptr, original.length);
+        const heapView = new Uint32Array(
+          module.HEAPU8.buffer,
+          ptr,
+          original.length,
+        );
         heapView[0] = 999;
 
         // Result should not be affected (it's a copy)
@@ -395,7 +410,14 @@ describe("Memory Utilities", () => {
   describe("Round-trip tests", () => {
     it("should round-trip Float64Array through WASM heap", () => {
       const original = new Float64Array([
-        0.0, 1.1, -2.2, 3.3, Math.PI, Math.E, Number.MAX_VALUE, Number.MIN_VALUE,
+        0.0,
+        1.1,
+        -2.2,
+        3.3,
+        Math.PI,
+        Math.E,
+        Number.MAX_VALUE,
+        Number.MIN_VALUE,
       ]);
       const ptr = toWasmFloat64(module, original);
 
@@ -545,7 +567,9 @@ describe("Memory Utilities", () => {
       // (0 threshold means error on any allocation, but clamping means it becomes 0)
       // Actually with threshold at 0, any allocation would exceed it
       // Let's verify the behavior is defined (no crash)
-      expect(() => configureMemory(module, { warnThreshold: -0.5 })).not.toThrow();
+      expect(() =>
+        configureMemory(module, { warnThreshold: -0.5 }),
+      ).not.toThrow();
     });
 
     it("should clamp thresholds greater than 1 to 1", () => {
@@ -553,7 +577,9 @@ describe("Memory Utilities", () => {
 
       // With threshold at 1.0, very large allocations should still work until truly at limit
       // Let's just verify it doesn't throw during configuration
-      expect(() => configureMemory(module, { errorThreshold: 1.5 })).not.toThrow();
+      expect(() =>
+        configureMemory(module, { errorThreshold: 1.5 }),
+      ).not.toThrow();
 
       // Verify behavior: with errorThreshold clamped to 1.0, we can allocate without error
       const data = new Float64Array(1000);
