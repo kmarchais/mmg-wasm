@@ -14,6 +14,7 @@ import {
   getFS2D,
   initMMG2D,
 } from "./mmg2d";
+import { SOL_ENTITY_2D, SOL_TYPE_2D } from "./mmg2d";
 import {
   IPARAM,
   MMG3D,
@@ -22,6 +23,7 @@ import {
   getFS,
   initMMG3D,
 } from "./mmg3d";
+import { SOL_ENTITY, SOL_TYPE } from "./mmg3d";
 import {
   IPARAM_S,
   MMGS,
@@ -30,8 +32,19 @@ import {
   getFSS,
   initMMGS,
 } from "./mmgs";
+import { SOL_ENTITY_S, SOL_TYPE_S } from "./mmgs";
 import { type RemeshOptions, applyOptions } from "./options";
 import type { RemeshResult } from "./result";
+import {
+  BoxSizingConstraint,
+  CircleSizingConstraint,
+  CylinderSizingConstraint,
+  type LocalSizingConstraint,
+  SphereSizingConstraint,
+  type Vec2,
+  type Vec3,
+  combineSizingConstraints,
+} from "./sizing";
 
 /**
  * Mesh types supported by the library
@@ -132,6 +145,7 @@ export class Mesh {
   private _handle: MeshHandle | MeshHandle2D | MeshHandleS;
   private _type: MeshType;
   private _disposed = false;
+  private _sizingConstraints: LocalSizingConstraint[] = [];
 
   /**
    * Create a mesh from vertex and cell data
@@ -312,7 +326,164 @@ export class Mesh {
   }
 
   // =====================
-  // Methods
+  // Local Sizing Methods
+  // =====================
+
+  /**
+   * Set target edge size inside a spherical region (3D only)
+   *
+   * Vertices inside the sphere will be refined to the specified size.
+   * Multiple constraints can be combined - the minimum size is used.
+   *
+   * @param center - Center of the sphere [x, y, z]
+   * @param radius - Radius of the sphere
+   * @param size - Target edge size inside the sphere
+   * @returns this (for method chaining)
+   * @throws Error if used with 2D mesh or invalid parameters
+   *
+   * @example
+   * ```typescript
+   * mesh.setSizeSphere([0.5, 0.5, 0.5], 0.2, 0.01);
+   * const result = await mesh.remesh();
+   * ```
+   */
+  setSizeSphere(center: Vec3, radius: number, size: number): this {
+    this.checkDisposed();
+
+    if (this._type === MeshType.Mesh2D) {
+      throw new Error(
+        "setSizeSphere is only available for 3D meshes. Use setSizeCircle for 2D meshes.",
+      );
+    }
+
+    this._sizingConstraints.push(
+      new SphereSizingConstraint(center, radius, size),
+    );
+    return this;
+  }
+
+  /**
+   * Set target edge size inside a circular region (2D only)
+   *
+   * Vertices inside the circle will be refined to the specified size.
+   * Multiple constraints can be combined - the minimum size is used.
+   *
+   * @param center - Center of the circle [x, y]
+   * @param radius - Radius of the circle
+   * @param size - Target edge size inside the circle
+   * @returns this (for method chaining)
+   * @throws Error if used with 3D mesh or invalid parameters
+   *
+   * @example
+   * ```typescript
+   * mesh.setSizeCircle([0.5, 0.5], 0.2, 0.01);
+   * const result = await mesh.remesh();
+   * ```
+   */
+  setSizeCircle(center: Vec2, radius: number, size: number): this {
+    this.checkDisposed();
+
+    if (this._type !== MeshType.Mesh2D) {
+      throw new Error(
+        "setSizeCircle is only available for 2D meshes. Use setSizeSphere for 3D meshes.",
+      );
+    }
+
+    this._sizingConstraints.push(
+      new CircleSizingConstraint(center, radius, size),
+    );
+    return this;
+  }
+
+  /**
+   * Set target edge size inside a box region
+   *
+   * For 3D meshes, the box is defined by min [x, y, z] and max [x, y, z].
+   * For 2D meshes, the box is defined by min [x, y] and max [x, y].
+   * Vertices inside the box will be refined to the specified size.
+   * Multiple constraints can be combined - the minimum size is used.
+   *
+   * @param min - Minimum corner of the box
+   * @param max - Maximum corner of the box
+   * @param size - Target edge size inside the box
+   * @returns this (for method chaining)
+   * @throws Error if dimensions don't match mesh type or invalid parameters
+   *
+   * @example
+   * ```typescript
+   * // 3D mesh
+   * mesh.setSizeBox([0, 0, 0], [0.3, 0.3, 0.3], 0.02);
+   *
+   * // 2D mesh
+   * mesh.setSizeBox([0, 0], [0.3, 0.3], 0.02);
+   * ```
+   */
+  setSizeBox(min: Vec2 | Vec3, max: Vec2 | Vec3, size: number): this {
+    this.checkDisposed();
+
+    const expectedDim = this._type === MeshType.Mesh2D ? 2 : 3;
+    if (min.length !== expectedDim || max.length !== expectedDim) {
+      throw new Error(
+        `For ${this._type} meshes, min and max must have ${expectedDim} dimensions`,
+      );
+    }
+
+    this._sizingConstraints.push(new BoxSizingConstraint(min, max, size));
+    return this;
+  }
+
+  /**
+   * Set target edge size inside a cylindrical region (3D only)
+   *
+   * The cylinder is defined by its axis (from p1 to p2) and radius.
+   * Vertices inside the cylinder will be refined to the specified size.
+   * Multiple constraints can be combined - the minimum size is used.
+   *
+   * @param p1 - First endpoint of the cylinder axis [x, y, z]
+   * @param p2 - Second endpoint of the cylinder axis [x, y, z]
+   * @param radius - Radius of the cylinder
+   * @param size - Target edge size inside the cylinder
+   * @returns this (for method chaining)
+   * @throws Error if used with 2D mesh or invalid parameters
+   *
+   * @example
+   * ```typescript
+   * mesh.setSizeCylinder([0, 0, 0], [1, 0, 0], 0.1, 0.01);
+   * const result = await mesh.remesh();
+   * ```
+   */
+  setSizeCylinder(p1: Vec3, p2: Vec3, radius: number, size: number): this {
+    this.checkDisposed();
+
+    if (this._type === MeshType.Mesh2D) {
+      throw new Error("setSizeCylinder is only available for 3D meshes.");
+    }
+
+    this._sizingConstraints.push(
+      new CylinderSizingConstraint(p1, p2, radius, size),
+    );
+    return this;
+  }
+
+  /**
+   * Clear all local size constraints
+   *
+   * @returns this (for method chaining)
+   */
+  clearLocalSizes(): this {
+    this._sizingConstraints = [];
+    return this;
+  }
+
+  /**
+   * Get the number of active local sizing constraints
+   */
+  get localSizeCount(): number {
+    return this._sizingConstraints.length;
+  }
+
+  // =====================
+  // Export Methods
   // =====================
 
   /**
@@ -419,6 +590,11 @@ export class Mesh {
     const workingHandle = this.cloneHandle();
 
     try {
+      // Apply local sizing constraints if any
+      if (this._sizingConstraints.length > 0) {
+        this.applySizingConstraints(workingHandle);
+      }
+
       // Capture quality before remeshing
       const qualityBefore = this.getMinQuality(workingHandle);
 
@@ -636,6 +812,7 @@ export class Mesh {
     mesh._handle = handle;
     mesh._type = this._type;
     mesh._disposed = false;
+    mesh._sizingConstraints = [];
     return mesh;
   }
 
@@ -654,6 +831,122 @@ export class Mesh {
         MMGS.free(handle as MeshHandleS);
         break;
     }
+  }
+
+  /**
+   * Apply local sizing constraints to a handle by setting the metric field
+   */
+  private applySizingConstraints(
+    handle: MeshHandle | MeshHandle2D | MeshHandleS,
+  ): void {
+    // Get vertices from the handle
+    let vertices: Float64Array;
+    let nVertices: number;
+
+    switch (this._type) {
+      case MeshType.Mesh2D:
+        vertices = MMG2D.getVertices(handle as MeshHandle2D);
+        nVertices = vertices.length / 2;
+        break;
+      case MeshType.Mesh3D:
+        vertices = MMG3D.getVertices(handle as MeshHandle);
+        nVertices = vertices.length / 3;
+        break;
+      case MeshType.MeshS:
+        vertices = MMGS.getVertices(handle as MeshHandleS);
+        nVertices = vertices.length / 3;
+        break;
+      default:
+        throw new Error(`Unknown mesh type: ${this._type}`);
+    }
+
+    // Compute combined sizes from all constraints
+    const dimension = this._type === MeshType.Mesh2D ? 2 : 3;
+    const sizes = combineSizingConstraints(
+      this._sizingConstraints,
+      vertices,
+      dimension as 2 | 3,
+    );
+
+    // Compute a default size for unconstrained vertices based on mesh bounding box
+    // MMG requires positive metric values - 0 is not valid
+    const defaultSize = this.computeDefaultSize(vertices, dimension);
+
+    // Convert infinite sizes to the default size
+    for (let i = 0; i < sizes.length; i++) {
+      if (!Number.isFinite(sizes[i])) {
+        sizes[i] = defaultSize;
+      }
+    }
+
+    // Set the solution size and values
+    switch (this._type) {
+      case MeshType.Mesh2D:
+        MMG2D.setSolSize(
+          handle as MeshHandle2D,
+          SOL_ENTITY_2D.VERTEX,
+          nVertices,
+          SOL_TYPE_2D.SCALAR,
+        );
+        MMG2D.setScalarSols(handle as MeshHandle2D, sizes);
+        break;
+      case MeshType.Mesh3D:
+        MMG3D.setSolSize(
+          handle as MeshHandle,
+          SOL_ENTITY.VERTEX,
+          nVertices,
+          SOL_TYPE.SCALAR,
+        );
+        MMG3D.setScalarSols(handle as MeshHandle, sizes);
+        break;
+      case MeshType.MeshS:
+        MMGS.setSolSize(
+          handle as MeshHandleS,
+          SOL_ENTITY_S.VERTEX,
+          nVertices,
+          SOL_TYPE_S.SCALAR,
+        );
+        MMGS.setScalarSols(handle as MeshHandleS, sizes);
+        break;
+    }
+  }
+
+  /**
+   * Compute a reasonable default edge size based on mesh bounding box
+   */
+  private computeDefaultSize(
+    vertices: Float64Array,
+    dimension: number,
+  ): number {
+    if (vertices.length === 0) {
+      return 1.0;
+    }
+
+    // Compute bounding box
+    const min = new Array(dimension).fill(Number.POSITIVE_INFINITY);
+    const max = new Array(dimension).fill(Number.NEGATIVE_INFINITY);
+
+    const nVertices = vertices.length / dimension;
+    for (let i = 0; i < nVertices; i++) {
+      for (let d = 0; d < dimension; d++) {
+        const v = vertices[i * dimension + d];
+        if (v < min[d]) min[d] = v;
+        if (v > max[d]) max[d] = v;
+      }
+    }
+
+    // Compute diagonal length
+    let diag2 = 0;
+    for (let d = 0; d < dimension; d++) {
+      const diff = max[d] - min[d];
+      diag2 += diff * diff;
+    }
+
+    // Use a fraction of the diagonal as default size
+    // This allows MMG to refine freely while respecting the mesh scale
+    // Handle degenerate case where all vertices are at the same point
+    const diag = Math.sqrt(diag2);
+    return diag > 0 ? diag * 0.2 : 1.0;
   }
 
   // =====================

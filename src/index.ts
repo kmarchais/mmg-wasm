@@ -64,6 +64,18 @@ export type { EmscriptenFS, PathAnalysis } from "./fs";
 // Export unified Mesh class
 export { Mesh, MeshType, type MeshData, type LoadOptions } from "./mesh";
 
+// Export local sizing types
+export {
+  type LocalSizingConstraint,
+  type Vec2,
+  type Vec3,
+  SphereSizingConstraint,
+  CircleSizingConstraint,
+  BoxSizingConstraint,
+  CylinderSizingConstraint,
+  combineSizingConstraints,
+} from "./sizing";
+
 // Export RemeshOptions and presets
 export {
   type RemeshOptions,
