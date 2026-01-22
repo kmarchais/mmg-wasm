@@ -12,7 +12,7 @@
     "build": "bun run build:wasm && bun run build:ts",
     "build:wasm": "emcmake cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build",
     "build:wasm:debug": "emcmake cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build",
-    "build:ts": "bun build src/index.ts --outdir dist --target browser",
+    "build:ts": "bun build src/index.ts --outdir dist --target browser --external '../build/dist/mmg.js' --external 'three'",
     "build:debug": "bun run build:wasm:debug && bun run build:ts",
     "build:docker": "docker build -t mmg-wasm-builder . && docker run --rm -v $(pwd)/build:/app/build mmg-wasm-builder",
     "dev": "bun run --watch src/index.ts",
@@ -28,7 +28,9 @@
     "web:install": "cd web && bun install",
     "web:dev": "cp build/dist/mmg.js build/dist/mmg.wasm web/ && cd web && bun run dev",
     "web:build": "cp build/dist/mmg.js build/dist/mmg.wasm web/ && cd web && bun run build",
-    "web:preview": "cd web && bun run preview"
+    "web:preview": "cd web && bun run preview",
+    "size:check": "./scripts/check-size.sh",
+    "bench": "bun test test/benchmark.test.ts --timeout 120000"
   },
   "peerDependencies": {
     "three": ">=0.150.0"

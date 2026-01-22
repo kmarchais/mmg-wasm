@@ -1,0 +1,66 @@
+name: Bundle Size Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  EMSDK_VERSION: "4.0.10"
+
+jobs:
+  size-check:
+    runs-on: ubuntu-latest
+    name: Check bundle size
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: ${{ env.EMSDK_VERSION }}
+          actions-cache-folder: emsdk-cache
+
+      - name: Build
+        run: bun run build
+
+      - name: Check bundle size
+        run: ./scripts/check-size.sh --ci
+
+      - name: Report sizes
+        if: always()
+        run: |
+          echo "## Bundle Size Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Size | Gzipped |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|------|---------|" >> $GITHUB_STEP_SUMMARY
+
+          WASM_SIZE=$(stat -c%s build/dist/mmg.wasm)
+          WASM_GZIP=$(gzip -c build/dist/mmg.wasm | wc -c)
+          echo "| WASM | $(numfmt --to=iec $WASM_SIZE) | $(numfmt --to=iec $WASM_GZIP) |" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f build/dist/mmg.js ]; then
+            JS_SIZE=$(stat -c%s build/dist/mmg.js)
+            JS_GZIP=$(gzip -c build/dist/mmg.js | wc -c)
+            echo "| JS Runtime | $(numfmt --to=iec $JS_SIZE) | $(numfmt --to=iec $JS_GZIP) |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ -f dist/index.js ]; then
+            TS_SIZE=$(stat -c%s dist/index.js)
+            TS_GZIP=$(gzip -c dist/index.js | wc -c)
+            echo "| TS Wrapper | $(numfmt --to=iec $TS_SIZE) | $(numfmt --to=iec $TS_GZIP) |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Budget:** WASM <3MB gzipped" >> $GITHUB_STEP_SUMMARY
