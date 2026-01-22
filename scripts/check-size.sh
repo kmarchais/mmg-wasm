@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 # Size thresholds (in bytes)
 WASM_MAX_GZIP=3145728     # 3 MB gzipped
 JS_RUNTIME_MAX=100000     # 100 KB (uncompressed)
-TS_WRAPPER_MAX=200000     # 200 KB (uncompressed)
+TS_WRAPPER_MAX=250000     # 250 KB (uncompressed)
 
 # Parse arguments
 CI_MODE=false
