@@ -1,7 +1,8 @@
 import { describe, expect, it, beforeAll, afterEach } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { Mesh, MeshType } from "../src/mesh";
+import { Mesh, MeshType, RemeshPresets } from "../src";
+import type { RemeshResult } from "../src/result";
 import { initMMG3D } from "../src/mmg3d";
 import { initMMG2D } from "../src/mmg2d";
 import { initMMGS } from "../src/mmgs";
@@ -417,6 +418,332 @@ describe("Mesh Class", () => {
       expect(mesh.dimension).toBe(3);
       expect(mesh.nVertices).toBe(4);
       expect(mesh.nCells).toBe(4);
+    });
+  });
+
+  describe("remesh() method", () => {
+    beforeAll(async () => {
+      await initMMG2D();
+      await initMMG3D();
+      await initMMGS();
+    });
+
+    describe("Basic remeshing", () => {
+      it("should remesh 3D mesh with default options", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+        expect(result.mesh).toBeInstanceOf(Mesh);
+        expect(result.nVertices).toBeGreaterThan(0);
+        expect(result.nCells).toBeGreaterThan(0);
+        expect(result.elapsed).toBeGreaterThan(0);
+      });
+
+      it("should remesh 2D mesh with default options", async () => {
+        const mesh = new Mesh({
+          vertices: squareVertices,
+          cells: squareTriangles,
+          boundaryFaces: squareEdges,
+        });
+        meshes.push(mesh);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+        expect(result.mesh.type).toBe(MeshType.Mesh2D);
+        expect(result.nVertices).toBeGreaterThan(0);
+        expect(result.nCells).toBeGreaterThan(0);
+      });
+
+      it("should remesh surface mesh with default options", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTriangles,
+          type: MeshType.MeshS,
+        });
+        meshes.push(mesh);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+        expect(result.mesh.type).toBe(MeshType.MeshS);
+        expect(result.nVertices).toBeGreaterThan(0);
+        expect(result.nCells).toBeGreaterThan(0);
+      });
+    });
+
+    describe("Immutable pattern", () => {
+      it("should not modify original mesh after remesh", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        const originalVertexCount = mesh.nVertices;
+        const originalCellCount = mesh.nCells;
+
+        // Remesh with finer mesh settings
+        const result = await mesh.remesh({ hmax: 0.2 });
+        meshes.push(result.mesh);
+
+        // Original mesh should be unchanged
+        expect(mesh.nVertices).toBe(originalVertexCount);
+        expect(mesh.nCells).toBe(originalCellCount);
+
+        // Result mesh should be different
+        expect(result.nVertices).toBeGreaterThan(originalVertexCount);
+      });
+
+      it("should allow multiple remesh calls on same mesh", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        const result1 = await mesh.remesh({ hmax: 0.3 });
+        const result2 = await mesh.remesh({ hmax: 0.5 });
+        meshes.push(result1.mesh, result2.mesh);
+
+        expect(result1.success).toBe(true);
+        expect(result2.success).toBe(true);
+
+        // Both results should be valid
+        expect(result1.nVertices).toBeGreaterThan(0);
+        expect(result2.nVertices).toBeGreaterThan(0);
+      });
+    });
+
+    describe("Quality metrics", () => {
+      it("should compute quality metrics", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        // Quality values should be between 0 and 1
+        expect(result.qualityBefore).toBeGreaterThanOrEqual(0);
+        expect(result.qualityBefore).toBeLessThanOrEqual(1);
+        expect(result.qualityAfter).toBeGreaterThanOrEqual(0);
+        expect(result.qualityAfter).toBeLessThanOrEqual(1);
+
+        // Quality improvement should be a positive number or Infinity
+        expect(result.qualityImprovement).toBeGreaterThan(0);
+      });
+
+      it("should improve quality with optimization mode", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        const result = await mesh.remesh(RemeshPresets.optimizeOnly());
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+        // Quality should not decrease significantly
+        expect(result.qualityAfter).toBeGreaterThanOrEqual(result.qualityBefore * 0.9);
+      });
+    });
+
+    describe("Remesh with options", () => {
+      it("should create finer mesh with small hmax", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        const coarseResult = await mesh.remesh({ hmax: 0.5 });
+        const fineResult = await mesh.remesh({ hmax: 0.2 });
+        meshes.push(coarseResult.mesh, fineResult.mesh);
+
+        // Finer mesh should have more elements
+        expect(fineResult.nVertices).toBeGreaterThan(coarseResult.nVertices);
+        expect(fineResult.nCells).toBeGreaterThan(coarseResult.nCells);
+      });
+
+      it("should use RemeshPresets", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        const result = await mesh.remesh(RemeshPresets.default());
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+        expect(result.nVertices).toBeGreaterThan(0);
+      });
+
+      it("should respect noinsert option", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        const originalVertexCount = mesh.nVertices;
+        const result = await mesh.remesh(RemeshPresets.noInsertions());
+        meshes.push(result.mesh);
+
+        expect(result.success).toBe(true);
+        // With noinsert, vertex count should not increase
+        expect(result.nVertices).toBeLessThanOrEqual(originalVertexCount);
+      });
+    });
+
+    describe("Result structure", () => {
+      it("should return complete RemeshResult structure", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        // Check all required fields exist
+        expect(result.mesh).toBeDefined();
+        expect(typeof result.nVertices).toBe("number");
+        expect(typeof result.nCells).toBe("number");
+        expect(typeof result.nBoundaryFaces).toBe("number");
+        expect(typeof result.elapsed).toBe("number");
+        expect(typeof result.qualityBefore).toBe("number");
+        expect(typeof result.qualityAfter).toBe("number");
+        expect(typeof result.qualityImprovement).toBe("number");
+        expect(typeof result.nInserted).toBe("number");
+        expect(typeof result.nDeleted).toBe("number");
+        expect(typeof result.nSwapped).toBe("number");
+        expect(typeof result.nMoved).toBe("number");
+        expect(typeof result.success).toBe("boolean");
+        expect(Array.isArray(result.warnings)).toBe(true);
+      });
+
+      it("should compute vertex insertion/deletion stats", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        // Fine mesh should insert vertices
+        const fineResult = await mesh.remesh({ hmax: 0.2 });
+        meshes.push(fineResult.mesh);
+
+        expect(fineResult.nInserted).toBeGreaterThan(0);
+        expect(fineResult.nDeleted).toBe(0);
+      });
+
+      it("should record elapsed time", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        expect(result.elapsed).toBeGreaterThan(0);
+      });
+    });
+
+    describe("Error handling", () => {
+      it("should throw on disposed mesh", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+        });
+
+        mesh.free();
+
+        await expect(mesh.remesh()).rejects.toThrow("Mesh has been disposed");
+      });
+    });
+
+    describe("Result mesh usability", () => {
+      it("should allow further remeshing on result mesh", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        const result1 = await mesh.remesh({ hmax: 0.4 });
+        meshes.push(result1.mesh);
+
+        const result2 = await result1.mesh.remesh({ hmax: 0.3 });
+        meshes.push(result2.mesh);
+
+        expect(result2.success).toBe(true);
+        expect(result2.nVertices).toBeGreaterThan(result1.nVertices);
+      });
+
+      it("should allow export of result mesh", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        const buffer = result.mesh.toArrayBuffer("mesh");
+        expect(buffer).toBeInstanceOf(Uint8Array);
+        expect(buffer.length).toBeGreaterThan(0);
+      });
+
+      it("should allow accessing vertices/cells of result mesh", async () => {
+        const mesh = new Mesh({
+          vertices: cubeVertices,
+          cells: cubeTetrahedra,
+          boundaryFaces: cubeTriangles,
+        });
+        meshes.push(mesh);
+
+        const result = await mesh.remesh();
+        meshes.push(result.mesh);
+
+        const vertices = result.mesh.vertices;
+        const cells = result.mesh.cells;
+
+        expect(vertices).toBeInstanceOf(Float64Array);
+        expect(cells).toBeInstanceOf(Int32Array);
+        expect(vertices.length).toBe(result.nVertices * 3);
+        expect(cells.length).toBe(result.nCells * 4); // tetrahedra have 4 vertices
+      });
     });
   });
 });

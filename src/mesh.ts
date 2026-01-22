@@ -30,6 +30,8 @@ import {
   getFSS,
   initMMGS,
 } from "./mmgs";
+import { type RemeshOptions, applyOptions } from "./options";
+import type { RemeshResult } from "./result";
 
 /**
  * Mesh types supported by the library
@@ -374,6 +376,284 @@ export class Mesh {
     }
 
     this._disposed = true;
+  }
+
+  /**
+   * Remesh the mesh with the given options
+   *
+   * This method performs mesh adaptation using the MMG library.
+   * The original mesh is unchanged (immutable pattern) - a new Mesh
+   * instance is returned in the result.
+   *
+   * @param options - Remeshing options (hmax, hmin, hausd, etc.)
+   * @returns Promise resolving to RemeshResult with new mesh and statistics
+   * @throws Error if remeshing fails
+   *
+   * @example
+   * ```typescript
+   * const mesh = await Mesh.create({ vertices, cells });
+   *
+   * // Simple remeshing with edge size control
+   * const result = await mesh.remesh({ hmax: 0.1 });
+   *
+   * // Access results
+   * console.log(`Vertices: ${result.nVertices}`);
+   * console.log(`Quality improved: ${result.qualityImprovement.toFixed(2)}x`);
+   *
+   * // Use the remeshed mesh
+   * const newMesh = result.mesh;
+   *
+   * // Original mesh is unchanged
+   * console.log(`Original vertices: ${mesh.nVertices}`);
+   * ```
+   */
+  async remesh(options: RemeshOptions = {}): Promise<RemeshResult> {
+    this.checkDisposed();
+
+    const startTime = performance.now();
+
+    // Store original counts for statistics
+    const originalVertexCount = this.nVertices;
+
+    // Clone mesh to a new handle for immutable pattern
+    const workingHandle = this.cloneHandle();
+
+    try {
+      // Capture quality before remeshing
+      const qualityBefore = this.getMinQuality(workingHandle);
+
+      // Apply options to the working handle
+      applyOptions(workingHandle, this._type, options);
+
+      // Run remeshing
+      const returnCode = this.runRemesh(workingHandle);
+
+      // Check return code
+      const success = returnCode === 0 || returnCode === 1;
+      if (returnCode === 2) {
+        throw new Error("Remeshing failed with strong failure (code 2)");
+      }
+
+      // Capture quality after remeshing
+      const qualityAfter = this.getMinQuality(workingHandle);
+
+      // Create result mesh from the working handle
+      const resultMesh = this.extractMeshFromHandle(workingHandle);
+
+      const elapsed = performance.now() - startTime;
+
+      // Estimate inserted/deleted vertices
+      const newVertexCount = resultMesh.nVertices;
+      const vertexDelta = newVertexCount - originalVertexCount;
+      const nInserted = vertexDelta > 0 ? vertexDelta : 0;
+      const nDeleted = vertexDelta < 0 ? -vertexDelta : 0;
+
+      return {
+        mesh: resultMesh,
+        nVertices: resultMesh.nVertices,
+        nCells: resultMesh.nCells,
+        nBoundaryFaces: resultMesh.nBoundaryFaces,
+        elapsed,
+        qualityBefore,
+        qualityAfter,
+        qualityImprovement:
+          qualityBefore > 0
+            ? qualityAfter / qualityBefore
+            : Number.POSITIVE_INFINITY,
+        nInserted,
+        nDeleted,
+        nSwapped: 0, // MMG doesn't expose this
+        nMoved: 0, // MMG doesn't expose this
+        success,
+        warnings:
+          returnCode === 1
+            ? ["Remeshing completed with warnings (low failure)"]
+            : [],
+      };
+    } catch (error) {
+      // Free the working handle on error
+      this.freeHandle(workingHandle);
+      throw error;
+    }
+  }
+
+  /**
+   * Clone the current mesh to a new handle
+   */
+  private cloneHandle(): MeshHandle | MeshHandle2D | MeshHandleS {
+    const newHandle = this.createHandle();
+
+    // Copy mesh data to new handle
+    switch (this._type) {
+      case MeshType.Mesh2D: {
+        const size = MMG2D.getMeshSize(this._handle as MeshHandle2D);
+        MMG2D.setMeshSize(
+          newHandle as MeshHandle2D,
+          size.nVertices,
+          size.nTriangles,
+          size.nQuads,
+          size.nEdges,
+        );
+        MMG2D.setVertices(
+          newHandle as MeshHandle2D,
+          MMG2D.getVertices(this._handle as MeshHandle2D),
+        );
+        if (size.nTriangles > 0) {
+          MMG2D.setTriangles(
+            newHandle as MeshHandle2D,
+            MMG2D.getTriangles(this._handle as MeshHandle2D),
+          );
+        }
+        if (size.nEdges > 0) {
+          MMG2D.setEdges(
+            newHandle as MeshHandle2D,
+            MMG2D.getEdges(this._handle as MeshHandle2D),
+          );
+        }
+        break;
+      }
+      case MeshType.Mesh3D: {
+        const size = MMG3D.getMeshSize(this._handle as MeshHandle);
+        MMG3D.setMeshSize(
+          newHandle as MeshHandle,
+          size.nVertices,
+          size.nTetrahedra,
+          size.nPrisms,
+          size.nTriangles,
+          size.nQuads,
+          size.nEdges,
+        );
+        MMG3D.setVertices(
+          newHandle as MeshHandle,
+          MMG3D.getVertices(this._handle as MeshHandle),
+        );
+        if (size.nTetrahedra > 0) {
+          MMG3D.setTetrahedra(
+            newHandle as MeshHandle,
+            MMG3D.getTetrahedra(this._handle as MeshHandle),
+          );
+        }
+        if (size.nTriangles > 0) {
+          MMG3D.setTriangles(
+            newHandle as MeshHandle,
+            MMG3D.getTriangles(this._handle as MeshHandle),
+          );
+        }
+        break;
+      }
+      case MeshType.MeshS: {
+        const size = MMGS.getMeshSize(this._handle as MeshHandleS);
+        MMGS.setMeshSize(
+          newHandle as MeshHandleS,
+          size.nVertices,
+          size.nTriangles,
+          size.nEdges,
+        );
+        MMGS.setVertices(
+          newHandle as MeshHandleS,
+          MMGS.getVertices(this._handle as MeshHandleS),
+        );
+        if (size.nTriangles > 0) {
+          MMGS.setTriangles(
+            newHandle as MeshHandleS,
+            MMGS.getTriangles(this._handle as MeshHandleS),
+          );
+        }
+        if (size.nEdges > 0) {
+          MMGS.setEdges(
+            newHandle as MeshHandleS,
+            MMGS.getEdges(this._handle as MeshHandleS),
+          );
+        }
+        break;
+      }
+    }
+
+    return newHandle;
+  }
+
+  /**
+   * Get minimum element quality from a handle
+   */
+  private getMinQuality(
+    handle: MeshHandle | MeshHandle2D | MeshHandleS,
+  ): number {
+    let qualities: Float64Array;
+
+    switch (this._type) {
+      case MeshType.Mesh2D:
+        qualities = MMG2D.getTrianglesQualities(handle as MeshHandle2D);
+        break;
+      case MeshType.Mesh3D:
+        qualities = MMG3D.getTetrahedraQualities(handle as MeshHandle);
+        break;
+      case MeshType.MeshS:
+        qualities = MMGS.getTrianglesQualities(handle as MeshHandleS);
+        break;
+      default:
+        throw new Error(`Unknown mesh type: ${this._type}`);
+    }
+
+    if (qualities.length === 0) {
+      return 0;
+    }
+
+    let min = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < qualities.length; i++) {
+      if (qualities[i] < min) {
+        min = qualities[i];
+      }
+    }
+
+    return min === Number.POSITIVE_INFINITY ? 0 : min;
+  }
+
+  /**
+   * Run the remeshing algorithm on a handle
+   */
+  private runRemesh(handle: MeshHandle | MeshHandle2D | MeshHandleS): number {
+    switch (this._type) {
+      case MeshType.Mesh2D:
+        return MMG2D.mmg2dlib(handle as MeshHandle2D);
+      case MeshType.Mesh3D:
+        return MMG3D.mmg3dlib(handle as MeshHandle);
+      case MeshType.MeshS:
+        return MMGS.mmgslib(handle as MeshHandleS);
+      default:
+        throw new Error(`Unknown mesh type: ${this._type}`);
+    }
+  }
+
+  /**
+   * Extract a new Mesh instance from a handle
+   * Note: The handle ownership is transferred to the new Mesh
+   */
+  private extractMeshFromHandle(
+    handle: MeshHandle | MeshHandle2D | MeshHandleS,
+  ): Mesh {
+    // Create a new Mesh that takes ownership of this handle
+    const mesh = Object.create(Mesh.prototype) as Mesh;
+    mesh._handle = handle;
+    mesh._type = this._type;
+    mesh._disposed = false;
+    return mesh;
+  }
+
+  /**
+   * Free a handle without affecting the main mesh
+   */
+  private freeHandle(handle: MeshHandle | MeshHandle2D | MeshHandleS): void {
+    switch (this._type) {
+      case MeshType.Mesh2D:
+        MMG2D.free(handle as MeshHandle2D);
+        break;
+      case MeshType.Mesh3D:
+        MMG3D.free(handle as MeshHandle);
+        break;
+      case MeshType.MeshS:
+        MMGS.free(handle as MeshHandleS);
+        break;
+    }
   }
 
   // =====================
