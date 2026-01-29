@@ -1135,7 +1135,11 @@ export class Mesh {
     }
 
     // Get max vertex index (1-indexed in MMG)
-    const maxVertexIndex = Math.max(...cells);
+    // Use a loop instead of Math.max(...cells) to avoid stack overflow on large meshes
+    let maxVertexIndex = cells[0];
+    for (let i = 1; i < cells.length; i++) {
+      if (cells[i] > maxVertexIndex) maxVertexIndex = cells[i];
+    }
 
     // Determine vertex dimension
     // vertices.length = nVertices * dimension
