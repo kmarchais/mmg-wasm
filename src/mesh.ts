@@ -206,9 +206,9 @@ export class Mesh {
     const FS = Mesh.getFS(type);
     const filename = `/input.${format}`;
 
-    FS.writeFile(filename, buffer);
-
     try {
+      FS.writeFile(filename, buffer);
+
       const mesh = new Mesh({
         vertices: new Float64Array(0),
         cells: new Int32Array(0),
