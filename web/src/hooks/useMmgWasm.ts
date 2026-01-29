@@ -7,19 +7,15 @@ import { DPARAM_S, IPARAM_S } from "@mmg-wasm/mmgs";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 let modulePromise: Promise<MmgModule> | null = null;
-let moduleInstance: MmgModule | null = null;
 
 async function loadModule(): Promise<MmgModule> {
-  if (moduleInstance) return moduleInstance;
-  if (modulePromise) return modulePromise;
-
-  modulePromise = (async () => {
-    const createModule = (await import("../../mmg.js"))
-      .default as () => Promise<MmgModule>;
-    moduleInstance = await createModule();
-    return moduleInstance;
-  })();
-
+  if (!modulePromise) {
+    modulePromise = (async () => {
+      const createModule = (await import("../../mmg.js"))
+        .default as () => Promise<MmgModule>;
+      return await createModule();
+    })();
+  }
   return modulePromise;
 }
 
