@@ -206,9 +206,9 @@ export class Mesh {
     const FS = Mesh.getFS(type);
     const filename = `/input.${format}`;
 
-    FS.writeFile(filename, buffer);
-
     try {
+      FS.writeFile(filename, buffer);
+
       const mesh = new Mesh({
         vertices: new Float64Array(0),
         cells: new Int32Array(0),
@@ -1145,25 +1145,28 @@ export class Mesh {
     // vertices.length = nVertices * dimension
     // So dimension = vertices.length / nVertices
     const vertexDim = vertices.length / maxVertexIndex;
+    const roundedDim = Math.round(vertexDim);
 
-    // Check if it's exactly 2 or 3
-    if (Math.abs(vertexDim - 2) < 0.01) {
-      // 2D mesh
+    if (
+      roundedDim < 2 ||
+      roundedDim > 3 ||
+      vertices.length % maxVertexIndex !== 0
+    ) {
+      throw new Error(
+        `Cannot auto-detect mesh type: vertex count (${vertices.length}) is not evenly divisible by max vertex index (${maxVertexIndex})`,
+      );
+    }
+
+    if (roundedDim === 2) {
       return MeshType.Mesh2D;
     }
 
-    if (Math.abs(vertexDim - 3) < 0.01) {
-      // 3D mesh - now determine if volume (tetrahedra) or surface (triangles)
-      const cellSize = Mesh.guessCellSize(cells, maxVertexIndex);
-      if (cellSize === 4) {
-        return MeshType.Mesh3D;
-      }
-      return MeshType.MeshS;
+    // 3D: determine if volume (tetrahedra) or surface (triangles)
+    const cellSize = Mesh.guessCellSize(cells, maxVertexIndex);
+    if (cellSize === 4) {
+      return MeshType.Mesh3D;
     }
-
-    throw new Error(
-      `Cannot auto-detect mesh type: computed vertexDim=${vertexDim.toFixed(2)}`,
-    );
+    return MeshType.MeshS;
   }
 
   /**

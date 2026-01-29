@@ -251,11 +251,11 @@ export async function toThreeGeometry(
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
 
   // Convert 1-indexed cells to 0-indexed for Three.js
-  const indices: number[] = [];
+  const indices = new Uint32Array(triangleIndices.length);
   for (let i = 0; i < triangleIndices.length; i++) {
-    indices.push(triangleIndices[i] - 1);
+    indices[i] = triangleIndices[i] - 1;
   }
-  geometry.setIndex(indices);
+  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
 
   // Compute normals if requested
   if (computeNormals) {
@@ -325,11 +325,11 @@ export function toThreeGeometrySync(
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
 
   // Convert 1-indexed to 0-indexed
-  const indices: number[] = [];
+  const indices = new Uint32Array(triangleIndices.length);
   for (let i = 0; i < triangleIndices.length; i++) {
-    indices.push(triangleIndices[i] - 1);
+    indices[i] = triangleIndices[i] - 1;
   }
-  geometry.setIndex(indices);
+  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
 
   if (computeNormals) {
     geometry.computeVertexNormals();

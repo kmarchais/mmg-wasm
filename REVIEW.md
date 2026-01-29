@@ -163,14 +163,15 @@ The global `modulePromise` check at line 14 has no lock. Multiple React componen
 
 **Fix:** Simplified to a single promise variable with the same lazy singleton pattern as 4.2. The redundant `moduleInstance` variable was removed.
 
-### 4.4 Worker Cancellation Cannot Interrupt WASM
+### 4.4 Worker Cancellation Cannot Interrupt WASM — ✅ Resolved (documented)
 
 **File:** `src/worker/remesh.worker.ts:104-105`
 **Severity:** MEDIUM
+**Status:** Documented in `fix/code-quality-issues` branch
 
 The `cancel()` method sets a `cancelled` flag, but once MMG's C code is executing in WASM, there is no way to interrupt it. The flag is only checked between JavaScript operations, not during the remeshing computation itself. Users may expect cancellation to be immediate.
 
-**Fix:** Document this limitation clearly. Consider adding a timeout mechanism that terminates and recreates the worker if cancellation is needed during a long-running operation.
+**Fix:** Added JSDoc to `handleRemesh` and `handleCancel` documenting cooperative cancellation semantics.
 
 ---
 
@@ -182,22 +183,22 @@ The `cancel()` method sets a `cancelled` flag, but once MMG's C code is executin
 |-------|----------|----------|
 | `Math.max(...cells)` stack overflow | `mesh.ts:1138` | High |
 | Unchecked intermediate malloc | `mmg3d.ts:465-471` | Medium |
-| FS temp file cleanup on error | `mesh.ts:205-229` | Low |
+| FS temp file cleanup on error | `mesh.ts:205-229` | Low | ✅ Fixed |
 
 ### Error Handling
 
 | Issue | Location | Severity |
 |-------|----------|----------|
 | Empty mesh not validated in constructor | `mesh.ts:156-160` | Medium |
-| `vertexDim - 2 < 0.01` tolerance in type detection | `mesh.ts:1146` | Medium |
-| Ambiguous cancel behavior when id is undefined | `worker/remesh.worker.ts:216-219` | Low |
+| `vertexDim - 2 < 0.01` tolerance in type detection | `mesh.ts:1146` | Medium | ✅ Fixed |
+| Ambiguous cancel behavior when id is undefined | `worker/remesh.worker.ts:216-219` | Low | ✅ Documented |
 
 ### Concurrency
 
 | Issue | Location | Severity |
 |-------|----------|----------|
 | Module init race condition | `mesh.ts:90-92` | High |
-| Worker cancellation race | `worker/remesh.worker.ts:104-105` | Medium |
+| Worker cancellation race | `worker/remesh.worker.ts:104-105` | Medium | ✅ Documented |
 | Demo module singleton race | `web/src/hooks/useMmgWasm.ts:9-24` | Medium |
 
 ### Web Demo
@@ -213,7 +214,7 @@ The `cancel()` method sets a `cancelled` flag, but once MMG's C code is executin
 | Issue | Location | Severity |
 |-------|----------|----------|
 | `Math.max(...cells)` for large arrays | `mesh.ts:1138` | High |
-| `number[]` intermediate in Three.js index conversion | `three/index.ts:254-258` | Low |
+| `number[]` intermediate in Three.js index conversion | `three/index.ts:254-258` | Low | ✅ Fixed |
 | Repeated vertex iteration in `computeDefaultSize` | `mesh.ts:1074-1084` | Low |
 
 ### Build Configuration

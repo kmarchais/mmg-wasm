@@ -95,6 +95,11 @@ function serializeMesh(mesh: Mesh): SerializedMeshData {
 
 /**
  * Handle remesh request
+ *
+ * Cancellation is cooperative: the `cancelled` flag is only checked between
+ * JavaScript stages (module init, mesh creation, post-remesh extraction).
+ * Once the WASM remeshing computation begins (`mesh.remesh()`), it cannot
+ * be interrupted until it returns.
  */
 async function handleRemesh(
   id: string,
@@ -212,6 +217,9 @@ async function handleRemesh(
 
 /**
  * Handle cancel request
+ *
+ * If `id` is `undefined`, cancels whatever operation is currently running.
+ * If `id` matches the current operation, cancels that specific operation.
  */
 function handleCancel(id?: string): void {
   if (id === undefined || id === currentOperationId) {
