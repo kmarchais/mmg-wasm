@@ -86,10 +86,10 @@ export interface LoadOptions {
   format?: "mesh" | "meshb";
 }
 
-// Track module initialization state
-let mmg2dInitialized = false;
-let mmg3dInitialized = false;
-let mmgsInitialized = false;
+// Track module initialization with promises to prevent race conditions
+let mmg2dInitPromise: Promise<void> | null = null;
+let mmg3dInitPromise: Promise<void> | null = null;
+let mmgsInitPromise: Promise<void> | null = null;
 
 /**
  * Initialize the appropriate MMG module for a mesh type
@@ -97,22 +97,22 @@ let mmgsInitialized = false;
 async function ensureModuleInitialized(type: MeshType): Promise<void> {
   switch (type) {
     case MeshType.Mesh2D:
-      if (!mmg2dInitialized) {
-        await initMMG2D();
-        mmg2dInitialized = true;
+      if (!mmg2dInitPromise) {
+        mmg2dInitPromise = initMMG2D();
       }
+      await mmg2dInitPromise;
       break;
     case MeshType.Mesh3D:
-      if (!mmg3dInitialized) {
-        await initMMG3D();
-        mmg3dInitialized = true;
+      if (!mmg3dInitPromise) {
+        mmg3dInitPromise = initMMG3D();
       }
+      await mmg3dInitPromise;
       break;
     case MeshType.MeshS:
-      if (!mmgsInitialized) {
-        await initMMGS();
-        mmgsInitialized = true;
+      if (!mmgsInitPromise) {
+        mmgsInitPromise = initMMGS();
       }
+      await mmgsInitPromise;
       break;
   }
 }
